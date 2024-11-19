@@ -27,7 +27,7 @@ cargo install terminal-velocity
 Or clone and build from source if you're one of those people:
 
 ```bash
-git clone https://github.com/yourusername/terminal-velocity.git
+git clone https://github.com/systemsoverload/terminal-velocity.git
 cd terminal-velocity
 cargo build --release
 ```
