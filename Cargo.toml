@@ -1,6 +1,6 @@
 [package]
 name = "terminal-velocity"
-version = "0.1.0"
+version = "0.1.1"
 build = "build.rs"
 description = "A blazingly fast static site generator for tech blogs"
 authors = ["TJK <tjkells@gmail.com>"]
@@ -11,6 +11,10 @@ homepage = "https://github.com/systemsoverload/terminal-velocity"
 repository = "https://github.com/systemsoverload/terminal-velocity"
 keywords = ["static-site", "blog", "markdown", "terminal", "retro"]
 categories = ["command-line-utilities", "web-programming"]
+
+[[bin]]
+name = "termv"
+path = "src/main.rs"
 
 [dependencies]
 chrono = "0.4"
