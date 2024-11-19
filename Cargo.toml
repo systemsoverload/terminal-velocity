@@ -9,7 +9,7 @@ license = "MIT"
 readme = "README.md"
 homepage = "https://github.com/systemsoverload/terminal-velocity"
 repository = "https://github.com/systemsoverload/terminal-velocity"
-keywords = ["static-site-generator", "blog", "markdown", "terminal", "retro"]
+keywords = ["static-site", "blog", "markdown", "terminal", "retro"]
 categories = ["command-line-utilities", "web-programming"]
 
 [dependencies]
