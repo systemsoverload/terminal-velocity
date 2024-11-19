@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+    {% for post in posts %}
+    <article>
+        <h2><a href="/posts/{{ post.metadata.slug }}">{{ post.metadata.title }}</a></h2>
+        <p>{{ post.metadata.preview }}</p>
+    </article>
+    {% endfor %}
+{% endblock %}

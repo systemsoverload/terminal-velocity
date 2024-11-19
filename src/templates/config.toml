@@ -1,0 +1,11 @@
+title = "My Terminal Velocity Blog"
+description = "A blazingly fast tech blog"
+base_url = "http://localhost:8000"
+
+[author]
+name = "Anonymous"
+email = "author@example.com"
+
+[build]
+output_dir = "dist"
+port = 8000

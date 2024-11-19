@@ -1,0 +1,38 @@
+[package]
+name = "terminal-velocity"
+version = "0.1.0"
+build = "build.rs"
+description = "A blazingly fast static site generator for tech blogs"
+authors = ["TJK <tjkells@gmail.com>"]
+edition = "2021"
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/systemsoverload/terminal-velocity"
+repository = "https://github.com/systemsoverload/terminal-velocity"
+keywords = ["static-site-generator", "blog", "markdown", "terminal", "retro"]
+categories = ["command-line-utilities", "web-programming"]
+
+[dependencies]
+chrono = "0.4"
+yaml-front-matter = "0.1"
+pulldown-cmark = { version = "0.9", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+tera = "1.19"
+walkdir = "2.3"
+clap = { version = "4.0", features = ["derive"] }
+console = "0.15"
+indicatif = "0.17"
+thiserror = "1.0"
+anyhow = "1.0"
+actix-web = "4.9.0"
+actix-files = "0.6.6"
+tokio = { version = "1.41.1", features = ["full"] }
+toml = "0.8.19"
+
+
+[build-dependencies]
+walkdir = "2"
+
+[dev-dependencies]
+tempfile = "3.14.0"
+
