@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::errors::Error;
+use crate::git::init_git_repository;
 
 pub fn create_directory_structure(path: &PathBuf) -> Result<(), Error> {
     let dirs = [
@@ -54,6 +55,16 @@ pub fn create_directory_structure(path: &PathBuf) -> Result<(), Error> {
         path.join("config.toml"),
         include_str!(concat!(env!("OUT_DIR"), "/templates/config.toml")),
     )?;
+
+    // Create .gitignore
+    let gitignore_content = r#"dist/
+    target/
+    **/.DS_Store
+    .env"#;
+    fs::write(path.join(".gitignore"), gitignore_content)?;
+
+    // Initialize git repository
+    init_git_repository(path)?;
 
     Ok(())
 }

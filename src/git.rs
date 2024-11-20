@@ -1,4 +1,7 @@
 use git2::Config as GitConfig;
+use git2::Repository;
+use git2::RepositoryInitOptions;
+use std::path::Path;
 
 use std::path::PathBuf;
 use std::process::Command;
@@ -34,4 +37,35 @@ pub fn open_editor(filepath: &PathBuf) -> Result<(), Error> {
     })?;
 
     Ok(())
+}
+
+pub fn init_git_repository(path: &Path) -> Result<Repository, Error> {
+    let mut opts = RepositoryInitOptions::new();
+    opts.initial_head("main");
+
+    let repo = Repository::init_opts(path, &opts)?;
+
+    {
+        // Create initial commit with all files
+        let mut index = repo.index()?;
+        index.add_all(["."].iter(), git2::IndexAddOption::DEFAULT, None)?;
+        index.write()?;
+
+        let tree_id = index.write_tree()?;
+        let tree = repo.find_tree(tree_id)?;
+        let signature = repo.signature()?;
+
+        repo.commit(
+            Some("HEAD"),
+            &signature,
+            &signature,
+            "Initial commit",
+            &tree,
+            &[],
+        )?;
+
+        // tree, index, and signature are dropped here
+    }
+
+    Ok(repo)
 }

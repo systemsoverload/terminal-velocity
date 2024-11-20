@@ -29,6 +29,9 @@ pub enum Error {
     #[error("Missing API key. Set ANTHROPIC_API_KEY environment variable or use --anthropic-key")]
     MissingApiKey,
 
+    #[error("Git error: {0}")]
+    Git(#[from] git2::Error),
+
     #[error(transparent)]
     Other(#[from] Box<dyn std::error::Error + Send + Sync>),
 }
