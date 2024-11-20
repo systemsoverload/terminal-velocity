@@ -149,6 +149,51 @@ slug: "your-post-slug"
 Your post content here...
 ```
 
+## LLM Integration
+
+Terminal Velocity includes integration with Claude, Anthropic's large language model, to help you get started with blog post writing. When creating a new post, you can provide a prompt to generate an initial outline.
+
+### Using the LLM Features
+
+To generate a blog post outline using Claude, use the `--prompt` flag with the `new` command:
+
+```bash
+# Create a new post with AI-generated outline
+termv new "My Post Title" --prompt "Write about the history and impact of the Rust programming language"
+
+# You can also set your API key via environment variable
+export ANTHROPIC_API_KEY=your_key_here
+termv new "My Post Title" --prompt "Explain WebAssembly and its use cases"
+```
+
+The `--prompt` flag requires an Anthropic API key, which you can provide in two ways:
+1. Set the `ANTHROPIC_API_KEY` environment variable
+2. Pass it directly using the `--anthropic-key` flag
+
+### Example
+
+```bash
+# Create a new post about distributed systems
+termv new "Understanding Distributed Systems" --prompt "Explain key concepts in distributed systems including consensus, replication, and fault tolerance"
+```
+
+This will create a new post with:
+- Standard frontmatter (title, date, etc.)
+- An AI-generated outline based on your prompt
+- A placeholder for your content
+
+The file will automatically open in your configured editor, where you can begin writing using the generated outline as a guide.
+
+### Tips for Good Prompts
+
+For best results with the outline generation:
+- Be specific about the topics you want to cover
+- Mention your target audience if relevant
+- Include any specific aspects or angles you want to explore
+- Note if you want a particular style (technical, beginner-friendly, etc.)
+
+Example prompt: "Write an outline for a technical blog post explaining WebAssembly to experienced JavaScript developers, focusing on real-world use cases and performance benefits"
+
 ## Configuration
 
 The `config.toml` file contains your site's configuration:
