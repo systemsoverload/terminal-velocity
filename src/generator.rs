@@ -1,7 +1,4 @@
-use crate::post::Post;
-use crate::post::PostMetadata;
 use chrono::NaiveDate;
-use pulldown_cmark::{html, Options, Parser as MarkdownParser};
 use std::fs::{self};
 use tera::{Context, Tera};
 use walkdir::WalkDir;
@@ -9,10 +6,14 @@ use yaml_front_matter::{Document, YamlFrontMatter};
 
 use crate::config::Config;
 use crate::errors::Error;
+use crate::markdown::MarkdownProcessor;
+use crate::post::Post;
+use crate::post::PostMetadata;
 
 pub struct SiteGenerator {
     config: Config,
     tera: Tera,
+    markdown: MarkdownProcessor,
 }
 
 impl SiteGenerator {
@@ -34,6 +35,7 @@ impl SiteGenerator {
         Ok(Self {
             config: config.clone(),
             tera,
+            markdown: MarkdownProcessor::new(),
         })
     }
 
@@ -55,20 +57,10 @@ impl SiteGenerator {
                     message: e.to_string(),
                 })?;
 
-            let mut options = Options::empty();
-            options.insert(Options::ENABLE_STRIKETHROUGH);
-            options.insert(Options::ENABLE_TABLES);
-            options.insert(Options::ENABLE_FOOTNOTES);
-            options.insert(Options::ENABLE_TASKLISTS);
-
-            let parser = MarkdownParser::new_ext(&doc.content, options);
-            let mut html_output = String::new();
-            html::push_html(&mut html_output, parser);
-
             posts.push(Post {
                 metadata: doc.metadata,
-                content: doc.content,
-                html_content: html_output,
+                content: doc.content.clone(),
+                html_content: self.markdown.render(&doc.content),
             });
         }
 

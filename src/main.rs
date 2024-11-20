@@ -6,6 +6,7 @@ mod errors;
 mod generator;
 mod git;
 mod init;
+mod markdown;
 mod post;
 mod serve;
 
