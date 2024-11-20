@@ -129,3 +129,159 @@ slug: "{}"
     fs::write(filepath.clone(), template)?;
     Ok(filepath)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_slugify() {
+        let test_cases = vec![
+            ("Hello World!", "hello-world"),
+            ("Test 123", "test-123"),
+            ("Multiple   Spaces", "multiple-spaces"),
+            ("special#@!characters", "specialcharacters"),
+            ("trailing-dash-", "trailing-dash"),
+            ("-leading-dash", "leading-dash"),
+            ("mixed_CASE_123", "mixed-case-123"),
+            ("", ""),
+            ("   ", ""),
+            ("###", ""),
+        ];
+
+        for (input, expected) in test_cases {
+            assert_eq!(slugify(input), expected);
+        }
+    }
+
+    #[test]
+    fn test_validate_date() {
+        use serde::Deserialize;
+
+        #[derive(Deserialize)]
+        struct TestDate {
+            #[serde(deserialize_with = "validate_date")]
+            date: String,
+        }
+
+        // Test valid date
+        let valid = toml::from_str::<TestDate>("date = '2024-01-01'").unwrap();
+        assert_eq!(valid.date, "2024-01-01");
+
+        // Test invalid dates
+        let invalid_cases = [
+            "date = '2024/01/01'",
+            "date = '01-01-2024'",
+            "date = '2024-13-01'",
+            "date = 'not-a-date'",
+        ];
+
+        for invalid in invalid_cases {
+            assert!(toml::from_str::<TestDate>(invalid).is_err());
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_new_post() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = Config {
+            site_dir: temp_dir.path().to_path_buf(),
+            base_url: "http://test.com".to_string(),
+            title: "Test Blog".to_string(),
+            description: "Test Description".to_string(),
+            author: config::Author {
+                name: "Test Author".to_string(),
+                email: "test@example.com".to_string(),
+            },
+            build: config::BuildConfig {
+                port: 8000,
+                verbose: false,
+                output_dir: "dist".to_string(),
+                posts_dir: "posts".to_string(),
+                templates_dir: "templates".to_string(),
+                static_dir: "static".to_string(),
+            },
+        };
+
+        // Create a new post
+        let title = "Test Post Title";
+        let filepath = create_new_post(&config, title, None, None).await.unwrap();
+
+        // Verify file was created
+        assert!(filepath.exists());
+
+        // Check content
+        let content = fs::read_to_string(filepath).unwrap();
+        assert!(content.contains("title: \"Test Post Title\""));
+        assert!(content.contains("slug: \"test-post-title\""));
+        assert!(content.contains("date: "));
+        assert!(content.contains("Write your post content here..."));
+    }
+
+    #[test]
+    fn test_empty_title_error() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = Config {
+            site_dir: temp_dir.path().to_path_buf(),
+            base_url: "http://test.com".to_string(),
+            title: "Test Blog".to_string(),
+            description: "Test Description".to_string(),
+            author: config::Author {
+                name: "Test Author".to_string(),
+                email: "test@example.com".to_string(),
+            },
+            build: config::BuildConfig {
+                port: 8000,
+                verbose: false,
+                output_dir: "dist".to_string(),
+                posts_dir: "posts".to_string(),
+                templates_dir: "templates".to_string(),
+                static_dir: "static".to_string(),
+            },
+        };
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let result = rt.block_on(create_new_post(&config, "###", None, None));
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_post_metadata_deserialization() {
+        let yaml = r#"---
+title: "Test Post"
+date: "2024-01-01"
+author: "Test Author"
+tags: ["tag1", "tag2"]
+preview: "Test preview"
+slug: "test-post"
+---"#;
+
+        let doc: yaml_front_matter::Document<PostMetadata> =
+            yaml_front_matter::YamlFrontMatter::parse(yaml).unwrap();
+
+        assert_eq!(doc.metadata.title, "Test Post");
+        assert_eq!(doc.metadata.date, "2024-01-01");
+        assert_eq!(doc.metadata.author, "Test Author");
+        assert_eq!(doc.metadata.tags, vec!["tag1", "tag2"]);
+        assert_eq!(doc.metadata.preview, "Test preview");
+        assert_eq!(doc.metadata.slug, "test-post");
+    }
+
+    #[test]
+    fn test_post_metadata_defaults() {
+        let yaml = r#"---
+title: "Test Post"
+date: "2024-01-01"
+slug: "test-post"
+---"#;
+
+        let doc: yaml_front_matter::Document<PostMetadata> =
+            yaml_front_matter::YamlFrontMatter::parse(yaml).unwrap();
+
+        assert_eq!(doc.metadata.author, "Anonymous");
+        assert!(doc.metadata.tags.is_empty());
+        assert_eq!(doc.metadata.preview, "");
+    }
+}
