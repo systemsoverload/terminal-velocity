@@ -67,11 +67,7 @@ pub async fn generate_outline(prompt: &str, api_key: Option<&str>) -> Result<Str
     let status = response.status();
     if !status.is_success() {
         let error_text = response.text().await.unwrap_or_default();
-        return Err(Error::Api(format!(
-            "API error {}: {}",
-            status,
-            error_text
-        )));
+        return Err(Error::Api(format!("API error {}: {}", status, error_text)));
     }
 
     let response: MessageResponse = response
@@ -79,7 +75,9 @@ pub async fn generate_outline(prompt: &str, api_key: Option<&str>) -> Result<Str
         .await
         .map_err(|e| Error::Api(format!("Failed to parse response: {}", e)))?;
 
-    response.content.first()
+    response
+        .content
+        .first()
         .map(|c| c.text.clone())
         .ok_or_else(|| Error::Api("No content in response".to_string()))
 }
