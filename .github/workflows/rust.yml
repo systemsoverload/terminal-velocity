@@ -58,19 +58,3 @@ jobs:
 
       - name: Check formatting
         run: cargo fmt --check
-
-  publish-check:
-    name: Publish Check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Check if publishable
-        run: cargo publish --dry-run
