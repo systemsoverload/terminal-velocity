@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.4] - 2024-11-20
 
 ### Added
+   - Server side syntax highlighting
+
+## [0.1.4] - 2024-11-20
+
+### Added
    - Claude integration
 ### Changed
    - Vastly simplified path management by relying solely on the config.toml data
