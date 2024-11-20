@@ -7,8 +7,6 @@ preview: "Get started with your new Terminal Velocity blog"
 slug: "welcome"
 ---
 
-# Welcome to Terminal Velocity
-
 This is your first blog post. Edit or delete it and start writing!
 
 ## Features

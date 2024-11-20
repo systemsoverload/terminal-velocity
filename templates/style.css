@@ -250,3 +250,114 @@ footer {
     border: 1px solid #ddd;
   }
 }
+
+
+/* Code syntax highlighting */
+.highlight {
+    margin: 1.5rem 0;
+    padding: 1.25rem;
+    border-radius: 0.5rem;
+    background: #f8fafc; /* Light slate background */
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    overflow-x: auto;
+}
+
+.highlight pre {
+    margin: 0;
+    padding: 0;
+}
+
+.highlight code {
+    font-family: ui-monospace, 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Menlo, monospace;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    font-variant-ligatures: none;
+}
+
+/* Light mode theme */
+.highlight .comment { color: #64748b; font-style: italic; } /* Slate 500 */
+.highlight .keyword { color: #7c3aed; font-weight: 500; } /* Violet 600 */
+.highlight .string { color: #059669; } /* Emerald 600 */
+.highlight .number { color: #0369a1; } /* Sky 700 */
+.highlight .function { color: #c026d3; } /* Fuchsia 600 */
+.highlight .operator { color: #475569; } /* Slate 600 */
+.highlight .class { color: #c026d3; font-weight: 500; } /* Fuchsia 600 */
+.highlight .variable { color: #334155; } /* Slate 700 */
+.highlight .type { color: #0284c7; font-weight: 500; } /* Sky 600 */
+.highlight .builtin { color: #0369a1; } /* Sky 700 */
+.highlight .namespace { color: #7c3aed; } /* Violet 600 */
+.highlight .constant { color: #0891b2; } /* Cyan 600 */
+.highlight .property { color: #0369a1; } /* Sky 700 */
+.highlight .punctuation { color: #475569; } /* Slate 600 */
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+    .highlight {
+        background: #1e293b; /* Slate 800 */
+        border-color: #334155; /* Slate 700 */
+    }
+
+    .highlight .comment { color: #94a3b8; } /* Slate 400 */
+    .highlight .keyword { color: #a78bfa; } /* Violet 400 */
+    .highlight .string { color: #34d399; } /* Emerald 400 */
+    .highlight .number { color: #38bdf8; } /* Sky 400 */
+    .highlight .function { color: #f0abfc; } /* Fuchsia 300 */
+    .highlight .operator { color: #cbd5e1; } /* Slate 300 */
+    .highlight .class { color: #f0abfc; } /* Fuchsia 300 */
+    .highlight .variable { color: #e2e8f0; } /* Slate 200 */
+    .highlight .type { color: #7dd3fc; } /* Sky 300 */
+    .highlight .builtin { color: #38bdf8; } /* Sky 400 */
+    .highlight .namespace { color: #a78bfa; } /* Violet 400 */
+    .highlight .constant { color: #22d3ee; } /* Cyan 400 */
+    .highlight .property { color: #38bdf8; } /* Sky 400 */
+    .highlight .punctuation { color: #cbd5e1; } /* Slate 300 */
+}
+
+/* Print styles */
+@media print {
+    .highlight {
+        border: 1px solid #e2e8f0;
+        box-shadow: none;
+        break-inside: avoid;
+    }
+}
+
+/* Optional: Line numbers */
+.highlight .ln {
+    margin-right: 1rem;
+    padding-right: 0.75rem;
+    color: #94a3b8; /* Slate 400 */
+    border-right: 1px solid #e2e8f0;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+@media (prefers-color-scheme: dark) {
+    .highlight .ln {
+        color: #64748b; /* Slate 500 */
+        border-right-color: #334155; /* Slate 700 */
+    }
+}
+
+/* Optional: Code block titles */
+.highlight-title {
+    font-family: ui-monospace, 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Menlo, monospace;
+    font-size: 0.75rem;
+    color: #64748b; /* Slate 500 */
+    padding: 0.5rem 1rem;
+    background: #f1f5f9; /* Slate 100 */
+    border: 1px solid #e2e8f0;
+    border-bottom: none;
+    border-radius: 0.5rem 0.5rem 0 0;
+    margin-bottom: -1px;
+}
+
+@media (prefers-color-scheme: dark) {
+    .highlight-title {
+        background: #1e293b; /* Slate 800 */
+        border-color: #334155; /* Slate 700 */
+        color: #94a3b8; /* Slate 400 */
+    }
+}
