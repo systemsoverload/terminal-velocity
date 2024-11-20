@@ -28,7 +28,9 @@ struct Content {
     text: String,
 }
 
-pub async fn generate_outline(prompt: &str, api_key: &str) -> Result<String, Error> {
+pub async fn generate_outline(prompt: &str, api_key: Option<&str>) -> Result<String, Error> {
+    let api_key = api_key.ok_or(Error::MissingApiKey)?;
+
     let client = reqwest::Client::new();
 
     let mut headers = HeaderMap::new();

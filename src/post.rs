@@ -97,7 +97,7 @@ pub async fn create_new_post(
 
     // Generate outline if requested
     let outline = if let (Some(prompt), Some(key)) = (prompt, api_key) {
-        Some(crate::anthropic::generate_outline(&prompt, &key).await?)
+        Some(crate::anthropic::generate_outline(&prompt, Some(&key)).await?)
     } else {
         None
     };
