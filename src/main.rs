@@ -153,8 +153,8 @@ fn main() -> Result<(), Error> {
             port,
             hot_reload,
         } => {
-            let dist_dir = dir.unwrap_or_else(|| PathBuf::from("./dist"));
-            serve(dist_dir, port, hot_reload)?;
+            let site_dir = dir.unwrap_or_else(|| PathBuf::from("."));
+            serve(site_dir, port, hot_reload)?;
         }
     }
 

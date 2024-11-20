@@ -1,25 +1,26 @@
-use std::process::Command;
-use std::time::Duration;
-use std::time::Instant;
-
 use actix_files::Files;
 use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpResponse, HttpServer};
 use notify::{RecursiveMode, Watcher};
-use std::sync::mpsc;
-
 use std::path::PathBuf;
+use std::process::Command;
+use std::sync::mpsc;
+use std::time::{Duration, Instant};
+
+use crate::config::Config;
 
 pub struct Server {
-    dist_dir: PathBuf,
+    site_dir: PathBuf,
+    output_dir: PathBuf,
     hot_reload: bool,
     port: u16,
 }
 
 impl Server {
-    pub fn new(dist_dir: PathBuf, port: u16, hot_reload: bool) -> Self {
+    pub fn new(site_dir: PathBuf, output_dir: PathBuf, port: u16, hot_reload: bool) -> Self {
         Self {
-            dist_dir,
+            site_dir,
+            output_dir,
             hot_reload,
             port,
         }
@@ -27,10 +28,6 @@ impl Server {
 
     pub async fn run(self) -> std::io::Result<()> {
         println!("Starting server on http://localhost:{}", self.port);
-        let dist_dir = self.dist_dir.clone();
-        // TODO - clean this up
-        let dist_dir_clone = self.dist_dir.clone();
-
         if self.hot_reload {
             let (tx, rx) = mpsc::channel();
 
@@ -43,7 +40,7 @@ impl Server {
 
             // Watch relevant directories
             for dir in ["posts", "templates", "static"].iter() {
-                let path = self.dist_dir.join(dir);
+                let path = self.site_dir.join(dir);
                 if path.exists() && watcher.watch(&path, RecursiveMode::Recursive).is_ok() {
                     println!("Watching directory: {}", path.display());
                 }
@@ -54,16 +51,16 @@ impl Server {
                 let debounce_duration = Duration::from_millis(500);
                 let _watcher = watcher; // Keep watcher alive in this thread
 
-                while let Ok(event) = rx.recv() {
-                    println!("Change detected: {:?}", event);
+                while let Ok(_event) = rx.recv() {
+                    println!("Change detected...");
 
                     // Debounce builds
                     if last_build.elapsed() >= debounce_duration {
                         println!("🔄 Rebuilding site...");
                         match Command::new("termv")
                             .arg("build")
-                            .arg("--path")
-                            .arg(&dist_dir_clone)
+                            .arg("-d")
+                            .arg(&self.site_dir)
                             .status()
                         {
                             Ok(status) if status.success() => {
@@ -82,7 +79,7 @@ impl Server {
             App::new()
                 .wrap(Logger::default())
                 .service(
-                    Files::new("/", dist_dir.clone())
+                    Files::new("/", self.output_dir.clone())
                         .index_file("index.html")
                         .use_last_modified(true)
                         .use_etag(true),
@@ -99,19 +96,23 @@ impl Server {
 }
 
 pub fn serve(
-    dist_dir: PathBuf,
+    site_dir: PathBuf,
     port: u16,
     hot_reload: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    if !dist_dir.exists() {
+    let config = Config::load(&site_dir)?;
+    // Always consider the output dir to be relative to the site dir
+    let output_dir = site_dir.join(config.build.output_dir);
+
+    if !output_dir.exists() {
         return Err(format!(
-            "Directory not found: {}. Run `term-v build` first.",
-            dist_dir.display()
+            "Output directory not found: {}. Run `term-v build` first.",
+            output_dir.display()
         )
         .into());
     }
 
-    let server = Server::new(dist_dir, port, hot_reload);
+    let server = Server::new(site_dir, output_dir, port, hot_reload);
     let runtime = tokio::runtime::Runtime::new()?;
     runtime.block_on(server.run())?;
     Ok(())
