@@ -28,15 +28,13 @@ struct Content {
     text: String,
 }
 
-// TODO - replace Error:Other with proper errors
-
 pub async fn generate_outline(prompt: &str, api_key: &str) -> Result<String, Error> {
     let client = reqwest::Client::new();
 
     let mut headers = HeaderMap::new();
     headers.insert(
         "x-api-key",
-        HeaderValue::from_str(api_key).map_err(|e| Error::Other(e.into()))?,
+        HeaderValue::from_str(api_key).map_err(|e| Error::Api(e.to_string()))?,
     );
     headers.insert("anthropic-version", HeaderValue::from_static("2023-06-01"));
     headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
@@ -62,14 +60,24 @@ pub async fn generate_outline(prompt: &str, api_key: &str) -> Result<String, Err
         .json(&request)
         .send()
         .await
-        .map_err(|e| Error::Other(e.into()))?;
+        .map_err(|e| Error::Api(format!("Connection failed: {}", e)))?;
 
-    if !response.status().is_success() {
+    let status = response.status();
+    if !status.is_success() {
         let error_text = response.text().await.unwrap_or_default();
-        return Err(Error::Other(format!("API error: {}", error_text).into()));
+        return Err(Error::Api(format!(
+            "API error {}: {}",
+            status,
+            error_text
+        )));
     }
 
-    let response: MessageResponse = response.json().await.map_err(|e| Error::Other(e.into()))?;
+    let response: MessageResponse = response
+        .json()
+        .await
+        .map_err(|e| Error::Api(format!("Failed to parse response: {}", e)))?;
 
-    Ok(response.content[0].text.clone())
+    response.content.first()
+        .map(|c| c.text.clone())
+        .ok_or_else(|| Error::Api("No content in response".to_string()))
 }
