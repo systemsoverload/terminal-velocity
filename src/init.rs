@@ -9,6 +9,7 @@ pub fn create_directory_structure(path: &PathBuf) -> Result<(), Error> {
         &path.join("posts"),
         &path.join("templates"),
         &path.join("static"),
+        &path.join("static/css"),
         &path.join("components"),
     ];
 
@@ -18,38 +19,60 @@ pub fn create_directory_structure(path: &PathBuf) -> Result<(), Error> {
 
     // Create default templates
     let templates = [
-        ("templates/post.html", include_str!("templates/post.html")),
-        ("templates/index.html", include_str!("templates/index.html")),
-        ("templates/base.html", include_str!("templates/base.html")),
+        (
+            "templates/post.html",
+            include_str!(concat!(env!("OUT_DIR"), "/templates/post.html")),
+        ),
+        (
+            "templates/index.html",
+            include_str!(concat!(env!("OUT_DIR"), "/templates/index.html")),
+        ),
+        (
+            "templates/base.html",
+            include_str!(concat!(env!("OUT_DIR"), "/templates/base.html")),
+        ),
     ];
 
     for (file, content) in &templates {
         fs::write(path.join(file), content)?;
     }
 
+    // Create default stylesheet
+    fs::write(
+        path.join("static/css/style.css"),
+        include_str!(concat!(env!("OUT_DIR"), "/templates/style.css")),
+    )?;
+
     // Create example post
-    let example_post = path.join("posts/example.md");
-    fs::write(example_post, include_str!("templates/example.md"))?;
+    fs::write(
+        path.join("posts/example.md"),
+        include_str!(concat!(env!("OUT_DIR"), "/templates/example.md")),
+    )?;
 
     // Create config file
-    let config = path.join("config.toml");
-    fs::write(config, include_str!("templates/config.toml"))?;
+    fs::write(
+        path.join("config.toml"),
+        include_str!(concat!(env!("OUT_DIR"), "/templates/config.toml")),
+    )?;
 
     Ok(())
 }
 
 pub fn validate_site_directory(path: &Path) -> Result<(), Error> {
-    let posts_dir = path.join("posts");
-    let templates_dir = path.join("templates");
+    let required_dirs = [
+        ("posts", "posts"),
+        ("templates", "templates"),
+        ("static/css", "static/css"),
+    ];
 
     if !path.exists() {
         return Err(Error::DirectoryNotFound(path.to_path_buf()));
     }
-    if !posts_dir.exists() {
-        return Err(Error::MissingDirectory("posts".to_string()));
-    }
-    if !templates_dir.exists() {
-        return Err(Error::MissingDirectory("templates".to_string()));
+
+    for (dir, name) in required_dirs {
+        if !path.join(dir).exists() {
+            return Err(Error::MissingDirectory(name.to_string()));
+        }
     }
 
     Ok(())

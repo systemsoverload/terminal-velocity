@@ -14,9 +14,12 @@ use crate::config::Config;
 use crate::errors::Error;
 
 pub struct SiteGenerator {
+    #[allow(dead_code)]
+    site_dir: PathBuf,
+
     posts_dir: PathBuf,
     output_dir: PathBuf,
-    templates_dir: PathBuf,
+    static_dir: PathBuf,
     tera: Tera,
     config: Config,
 }
@@ -28,9 +31,11 @@ impl SiteGenerator {
             None => Config::load(site_dir)?,
         };
 
+        // TODO - make all of these configurable in config.toml
         let posts_dir = site_dir.join("posts");
-        let output_dir = PathBuf::from(&config.build.output_dir);
+        let output_dir = site_dir.join(PathBuf::from(&config.build.output_dir));
         let templates_dir = site_dir.join("templates");
+        let static_dir = site_dir.join("static");
 
         fs::create_dir_all(&output_dir)?;
 
@@ -38,9 +43,10 @@ impl SiteGenerator {
             .map_err(Error::Template)?;
 
         Ok(Self {
+            site_dir: site_dir.to_path_buf(),
             posts_dir,
             output_dir,
-            templates_dir,
+            static_dir,
             tera,
             config,
         })
@@ -110,29 +116,32 @@ impl SiteGenerator {
         fs::write(self.output_dir.join("index.html"), html)?;
         Ok(())
     }
-    fn copy_static_assets(&self) -> Result<(), Error> {
-        let static_dir = self.templates_dir.join("static");
-        if static_dir.exists() {
-            let output_static = self.output_dir.join("static");
-            fs::create_dir_all(&output_static)?;
 
-            for entry in WalkDir::new(&static_dir).into_iter().filter_map(|e| e.ok()) {
-                if entry.path().is_file() {
-                    let relative_path = entry
-                        .path()
-                        .strip_prefix(&static_dir)
-                        .map_err(|_| Error::DirectoryNotFound(static_dir.clone()))?;
-                    let output_path = output_static.join(relative_path);
-
-                    if let Some(parent) = output_path.parent() {
-                        fs::create_dir_all(parent)?;
-                    }
-
-                    fs::copy(entry.path(), output_path)?;
+    fn copy_static_files(&self) -> Result<(), Error> {
+        if self.static_dir.exists() {
+            for entry in WalkDir::new(&self.static_dir)
+                .into_iter()
+                .filter_map(Result::ok)
+                .filter(|e| e.file_type().is_file())
+            {
+                let relative_path = entry
+                    .path()
+                    .strip_prefix(&self.static_dir)
+                    .map_err(|_| Error::DirectoryNotFound(self.static_dir.clone()))?;
+                let dest_path = self.output_dir.join("static").join(relative_path);
+                // Create parent directories if they don't exist
+                if let Some(parent) = dest_path.parent() {
+                    fs::create_dir_all(parent)?;
                 }
+
+                fs::copy(entry.path(), &dest_path)?;
+
+                // TODO - implement verbosity in Config
+                // if self.config.build.verbose {
+                //     println!("Copied static file: {}", relative_path.display());
+                // }
             }
         }
-
         Ok(())
     }
 
@@ -163,7 +172,7 @@ impl SiteGenerator {
         self.generate_index_page(&posts)?;
 
         pb.set_message("Copying static assets...");
-        self.copy_static_assets()?;
+        self.copy_static_files()?;
 
         pb.finish_and_clear();
 
@@ -259,7 +268,6 @@ This is a test post."#,
         let generator = SiteGenerator::new(temp_dir.path(), Some(config))?;
 
         assert!(generator.posts_dir.exists());
-        assert!(generator.templates_dir.exists());
         Ok(())
     }
 
@@ -325,11 +333,11 @@ This is a test post."#,
         let generator = SiteGenerator::new(temp_dir.path(), Some(config))?;
 
         // Create a test static file
-        let static_dir = generator.templates_dir.join("static");
+        let static_dir = generator.site_dir.join("static");
         fs::create_dir_all(&static_dir)?;
         fs::write(static_dir.join("test.css"), "body { color: green; }")?;
 
-        generator.copy_static_assets()?;
+        generator.copy_static_files()?;
 
         let output_path = generator.output_dir.join("static").join("test.css");
         assert!(output_path.exists());
