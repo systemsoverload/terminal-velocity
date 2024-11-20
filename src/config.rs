@@ -8,6 +8,7 @@ use std::path::Path;
 pub struct Config {
     pub title: String,
     pub description: String,
+    #[serde(deserialize_with = "normalize_url")]
     pub base_url: String,
     pub author: Author,
     pub build: BuildConfig,
@@ -22,7 +23,10 @@ pub struct Author {
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct BuildConfig {
     pub output_dir: String,
+    #[serde(deserialize_with = "validate_port")]
     pub port: u16,
+    #[serde(default)]
+    pub verbose: bool,
 }
 
 impl Config {
@@ -41,4 +45,25 @@ impl Config {
         let default_config = include_str!(concat!(env!("OUT_DIR"), "/templates/config.toml"));
         toml::from_str(default_config).expect("Failed to parse default config")
     }
+}
+
+fn normalize_url<'de, D>(deserializer: D) -> Result<String, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let url = String::deserialize(deserializer)?;
+    Ok(url.trim_end_matches('/').to_string())
+}
+
+fn validate_port<'de, D>(deserializer: D) -> Result<u16, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let port = u16::deserialize(deserializer)?;
+    if !(1024..=65535).contains(&port) {
+        return Err(serde::de::Error::custom(
+            "Port must be between 1024 and 65535",
+        ));
+    }
+    Ok(port)
 }
