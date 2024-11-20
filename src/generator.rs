@@ -4,7 +4,7 @@ use chrono::NaiveDate;
 use pulldown_cmark::{html, Options, Parser as MarkdownParser};
 use std::{
     fs::{self},
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 use tera::{Context, Tera};
 use walkdir::WalkDir;
