@@ -1,5 +1,7 @@
 # Terminal Velocity
 
+[![Main Branch Status](https://github.com/systemsoverload/terminal-velocity/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/your-username/terminal-velocity/actions/workflows/rust.yml)
+
 A blazingly fast static site generator for developers who want to write things down. Built with Rust for performance and efficiency.
 
 ```
