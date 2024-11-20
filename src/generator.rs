@@ -105,6 +105,7 @@ impl SiteGenerator {
         context.insert("config", &self.config);
         context.insert("title", &self.config.title); // Required by base.html
 
+        // TODO - Handle the case where the index template doesn't exist (yet?)
         let html = self.tera.render("index.html", &context)?;
         fs::write(self.output_dir.join("index.html"), html)?;
         Ok(())

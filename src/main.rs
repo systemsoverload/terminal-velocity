@@ -1,3 +1,5 @@
+#![deny(unused_crate_dependencies)]
+
 mod config;
 mod errors;
 mod generator;
@@ -36,31 +38,39 @@ const BANNER: &str = r#"
 
 #[derive(Parser)]
 #[command(name = "termv")]
-#[command(about = "A blazingly fast static site generator for tech blogs")]
+#[command(about = "A blazingly fast static site generator for dorks")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
 }
 
+// TODO - untangle the spaghetti that is target dir, dist dir, etc by referring to the config.toml instead
+
 #[derive(Subcommand)]
 enum Commands {
     /// Initialize a new blog
     Init {
-        #[arg(short, long)]
-        path: Option<PathBuf>,
+        #[arg(short, long = "target-dir", default_value = ".")]
+        dir: Option<PathBuf>,
     },
     /// Create a new blog post
     New { title: String },
     /// Serve the site locally
     Serve {
-        #[arg(short, long)]
-        path: Option<PathBuf>,
+        #[arg(short, long = "target-dir", default_value = ".")]
+        dir: Option<PathBuf>,
+
+        #[arg(long, default_value_t = 8080)]
+        port: u16,
+
+        #[arg(long)]
+        hot_reload: bool,
     },
     /// Build the site
     Build {
         /// Path to the site directory
-        #[arg(short, long)]
-        path: Option<PathBuf>,
+        #[arg(short, long = "target-dir", default_value = ".")]
+        dir: Option<PathBuf>,
 
         /// Output directory for the generated site
         #[arg(short, long, default_value = "dist")]
@@ -76,22 +86,24 @@ fn main() -> Result<(), Error> {
     let cli = Cli::parse();
 
     let accent = Style::new().cyan();
-    println!("{}", accent.apply_to(BANNER));
+
     match cli.command {
-        Commands::Init { path } => {
-            create_directory_structure(&path.clone().unwrap_or_else(|| PathBuf::from(".")))?;
-            println!("✨ Created new blog at {}", path.expect("REASON").display());
+        Commands::Init { dir } => {
+            println!("{}", accent.apply_to(BANNER));
+
+            create_directory_structure(&dir.clone().unwrap_or_else(|| PathBuf::from(".")))?;
+            println!("✨ Created new blog at {}", &dir.expect("REASON").display());
         }
         Commands::New { title } => {
             create_new_post(&title)?;
             println!("📝 Created new post: {}", title);
         }
         Commands::Build {
-            path,
+            dir,
             output_path,
             verbose,
         } => {
-            let site_dir = path.unwrap_or_else(|| PathBuf::from("."));
+            let site_dir = dir.unwrap_or_else(|| PathBuf::from("."));
             let absolute_site_dir = fs::canonicalize(&site_dir)?;
             let config = Config::load(&site_dir)?;
 
@@ -136,8 +148,13 @@ fn main() -> Result<(), Error> {
             }
         }
 
-        Commands::Serve { path } => {
-            serve(path)?;
+        Commands::Serve {
+            dir,
+            port,
+            hot_reload,
+        } => {
+            let dist_dir = dir.unwrap_or_else(|| PathBuf::from("./dist"));
+            serve(dist_dir, port, hot_reload)?;
         }
     }
 
