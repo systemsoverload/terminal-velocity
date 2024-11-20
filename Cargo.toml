@@ -1,8 +1,8 @@
 [package]
 name = "terminal-velocity"
-version = "0.1.2"
+version = "0.1.3"
 build = "build.rs"
-description = "A blazingly fast static site generator for tech blogs"
+description = "A blazingly fast static site generator for dorks"
 authors = ["TJK <tjkells@gmail.com>"]
 edition = "2021"
 license = "MIT"
