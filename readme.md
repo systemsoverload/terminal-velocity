@@ -188,6 +188,42 @@ cargo build
 cargo test
 ```
 
+
+## Publishing
+
+To publish a new version:
+
+1. Update the version in `Cargo.toml`
+2. Update CHANGELOG.md
+3. Commit the changes
+4. Create a new version tag:
+   ```bash
+   git tag -a v0.1.0 -m "Release version 0.1.0"
+   ```
+5. Push the tag:
+   ```bash
+   git push origin v0.1.0
+   ```
+
+The GitHub Action will automatically:
+1. Verify the version matches the tag
+2. Run all tests
+3. Publish to crates.io
+4. Create a GitHub release
+
+### Publishing Manually
+
+If you need to publish manually:
+
+```bash
+# Verify everything works
+cargo test
+cargo publish --dry-run
+
+# Publish to crates.io
+cargo publish
+```
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
