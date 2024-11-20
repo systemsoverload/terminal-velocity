@@ -1,4 +1,4 @@
-name: Rust CI
+name: Main Branch
 
 on:
   push:
