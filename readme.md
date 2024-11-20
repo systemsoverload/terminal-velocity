@@ -1,124 +1,195 @@
-# Terminal Velocity 🚀
+# Terminal Velocity
 
-[![Crates.io](https://img.shields.io/crates/v/terminal-velocity.svg)](https://crates.io/crates/terminal-velocity)
-[![Downloads](https://img.shields.io/crates/d/terminal-velocity.svg)](https://crates.io/crates/terminal-velocity)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+A blazingly fast static site generator for developers who want to write things down. Built with Rust for performance and efficiency.
 
-> Because your blog should load faster than a `cd` command.
+```
+████████╗███████╗██████╗ ███╗   ███╗██╗███╗   ██╗ █████╗ ██╗      
+╚══██╔══╝██╔════╝██╔══██╗████╗ ████║██║████╗  ██║██╔══██╗██║      
+   ██║   █████╗  ██████╔╝██╔████╔██║██║██╔██╗ ██║███████║██║      
+   ██║   ██╔══╝  ██╔══██╗██║╚██╔╝██║██║██║╚██╗██║██╔══██║██║      
+   ██║   ███████╗██║  ██║██║ ╚═╝ ██║██║██║ ╚████║██║  ██║███████╗ 
+   ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝ 
 
-Terminal Velocity is a blazingly fast static site generator that turns your markdown files into a sleek, retro-terminal styled tech blog. Perfect for developers who think RGB keyboards aren't enough.
+██╗   ██╗███████╗██╗      ██████╗  ██████╗██╗████████╗██╗   ██╗   
+██║   ██║██╔════╝██║     ██╔═══██╗██╔════╝██║╚══██╔══╝╚██╗ ██╔╝   
+██║   ██║█████╗  ██║     ██║   ██║██║     ██║   ██║    ╚████╔╝    
+╚██╗ ██╔╝██╔══╝  ██║     ██║   ██║██║     ██║   ██║     ╚██╔╝     
+ ╚████╔╝ ███████╗███████╗╚██████╔╝╚██████╗██║   ██║      ██║      
+  ╚═══╝  ╚══════╝╚══════╝ ╚═════╝  ╚═════╝╚═╝   ╚═╝      ╚═╝      
+```
 
-## Features ⚡
+## Features
 
-- 🖥️ Retro terminal aesthetic that would make GNU proud
-- ⌨️ Markdown-driven because WYSIWYG is for mortals
-- 🚄 Blazingly fast™ because it's written in Rust
-- 🎨 Built-in cyberpunk theme that would make Gibson proud
-- 🏷️ Tag support that puts your Gmail filters to shame
-- 📱 Responsive design because even hackers use phones
-- 🔧 Zero config because ain't nobody got time for that
+- 🚀 Lightning fast builds with Rust
+- 📝 Markdown support with YAML frontmatter
+- 🎨 Customizable templates using Tera
+- 🔥 Hot reloading during development
+- 📁 Static file handling
+- 🏷️ Tag support for posts
+- 🎯 Simple and intuitive CLI
 
-## Installation 💾
+## Installation
+
+### From Source
+
+1. Make sure you have Rust and Cargo installed
+2. Clone the repository
+3. Build and install:
 
 ```bash
 cargo install terminal-velocity
 ```
 
-Or clone and build from source if you're one of those people:
+## Quick Start
 
+1. Create a new blog:
 ```bash
-git clone https://github.com/systemsoverload/terminal-velocity.git
-cd terminal-velocity
-cargo build --release
+termv init hello-world
 ```
 
-## Usage 🔧
-
-### Initialize a new blog
-
+2. Create a new post:
 ```bash
-termv init my-cyber-blog
+termv new "My First Post"
 ```
 
-### Create a new post
-
-```bash
-termv new "Why Mechanical Keyboards Are Actually Time Machines"
-```
-
-### Build your site
-
+3. Build the site:
 ```bash
 termv build
 ```
 
-### Deploy to the mainframe (or just serve locally)
-
+4. Serve locally:
 ```bash
 termv serve
 ```
 
-## File Structure 📁
+## Project Structure
+
+After initialization, your project will have the following structure:
 
 ```
-your-blog/
-├── _posts/
-│   └── 2024-11-18-why-vim-is-better.md
-├── _templates/
-│   └── they-work-fine-out-of-the-box.html
-└── _config.yml (optional, we're not Jekyll)
+my-blog/
+├── posts/          # Your markdown posts go here
+├── templates/      # Tera templates
+│   ├── base.html
+│   ├── index.html
+│   └── post.html
+├── static/         # Static assets (CSS, images, etc.)
+├── components/     # Reusable template components
+└── config.toml     # Site configuration
 ```
 
-## Post Format 📝
+## Command Reference
+
+### `init`
+
+Initialize a new blog site:
+
+```bash
+termv init [path]
+```
+
+Options:
+- `path`: Directory to create the new blog in (default: current directory)
+
+### `new`
+
+Create a new blog post:
+
+```bash
+termv new "Your Post Title"
+```
+
+This will create a new markdown file in the `posts` directory with the following format:
+- Filename: `YYYY-MM-DD-your-post-title.md`
+- Pre-populated frontmatter
+- Slugified title for URLs
+
+### `build`
+
+Build your site:
+
+```bash
+termv build [options]
+```
+
+Options:
+- `--target-dir, -t`: Source directory containing your site (default: current directory)
+- `--output-path, -o`: Output directory for the built site (default: "dist")
+- `--verbose, -v`: Show verbose output during build
+
+### `serve`
+
+Serve your site locally:
+
+```bash
+termv serve [options]
+```
+
+Options:
+- `--target-dir, -t`: Directory containing the built site (default: "./dist")
+- `--port`: Port to serve on (default: 8080)
+- `--hot-reload`: Enable hot reloading on file changes
+
+## Post Format
+
+Posts should be written in Markdown with YAML frontmatter:
 
 ```markdown
 ---
-title: "Why I Rebuilt Git in Rust (and Why You Shouldn't)"
-date: 2024-11-18
-tags: ["rust", "git", "bad-ideas", "over-engineering"]
+title: "Your Post Title"
+date: 2024-11-19
+author: "Your Name"
+tags: ["rust", "blog"]
+preview: "A brief preview of your post"
+slug: "your-post-slug"
 ---
 
-Here's why I spent 6 months rebuilding Git in Rust...
+Your post content here...
 ```
 
-## Performance 📊
+## Configuration
 
-| Generator          | Build Time | Coolness Factor |
-|-------------------|------------|-----------------|
-| Terminal Velocity | 0.3s       | Over 9000      |
-| Jekyll            | 3.2s       | Meh            |
-| Hugo             | 0.8s       | Pretty good    |
-| Writing by hand  | ∞          | Maximum        |
+The `config.toml` file contains your site's configuration:
 
-## FAQ 🤔
+```toml
+title = "Your Site Title"
+description = "Your site description"
+base_url = "https://your-site.com"
 
-**Q: Why another static site generator?**
-A: Because the world needed a static site generator that makes your blog look like you're hacking the mainframe.
+[author]
+name = "Your Name"
+email = "your@email.com"
 
-**Q: Is it production ready?**
-A: If you have to ask, you're not ready for the aesthetic.
+[build]
+output_dir = "dist"
+port = 8080
+```
 
-**Q: Why Rust?**
-A: Have you tried telling people you wrote something in Rust? It's better than CrossFit.
+## Development
 
-## Contributing 🤝
+### Requirements
 
-1. Fork it
-2. Create your feature branch
-3. Make it more blazingly fast
-4. Push to the branch
-5. Create a Pull Request
+- Rust 1.70+
+- Cargo
 
-## License 📜
+### Building from Source
 
-MIT License - Because even hackers need lawyers.
+1. Clone the repository
+2. Install dependencies and build:
+```bash
+cargo build
+```
 
-## Acknowledgments 🙏
+### Running Tests
 
-- The Rust community, for making "blazingly fast" a personality trait
-- The 1980s, for the aesthetic
-- Coffee, for obvious reasons
+```bash
+cargo test
+```
 
----
+## Contributing
 
-Made with ⚡ by developers who type really fast on mechanical keyboards
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

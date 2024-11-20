@@ -50,8 +50,8 @@ struct Cli {
 enum Commands {
     /// Initialize a new blog
     Init {
-        #[arg(short, long = "target-dir", default_value = ".")]
-        dir: Option<PathBuf>,
+        #[arg(default_value = ".")]
+        dir: PathBuf,
     },
     /// Create a new blog post
     New { title: String },
@@ -91,8 +91,8 @@ fn main() -> Result<(), Error> {
         Commands::Init { dir } => {
             println!("{}", accent.apply_to(BANNER));
 
-            create_directory_structure(&dir.clone().unwrap_or_else(|| PathBuf::from(".")))?;
-            println!("✨ Created new blog at {}", &dir.expect("REASON").display());
+            create_directory_structure(&dir)?;
+            println!("✨ Created new site at {}", &dir.display());
         }
         Commands::New { title } => {
             create_new_post(&title)?;
