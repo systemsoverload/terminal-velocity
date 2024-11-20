@@ -157,9 +157,15 @@ impl SiteGenerator {
 
         pb.set_message("Sorting posts...");
         posts.sort_by(|a, b| {
-            NaiveDate::parse_from_str(&b.metadata.date, "%Y-%m-%d")
-                .unwrap()
-                .cmp(&NaiveDate::parse_from_str(&a.metadata.date, "%Y-%m-%d").unwrap())
+            match (
+                NaiveDate::parse_from_str(&a.metadata.date, "%Y-%m-%d"),
+                NaiveDate::parse_from_str(&b.metadata.date, "%Y-%m-%d"),
+            ) {
+                (Ok(date_a), Ok(date_b)) => date_b.cmp(&date_a),
+                (Ok(_), Err(_)) => std::cmp::Ordering::Less,
+                (Err(_), Ok(_)) => std::cmp::Ordering::Greater,
+                (Err(_), Err(_)) => a.metadata.date.cmp(&b.metadata.date), // Fall back to string comparison
+            }
         });
 
         pb.set_message("Generating post pages...");
