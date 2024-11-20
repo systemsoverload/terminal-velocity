@@ -25,17 +25,12 @@ pub struct SiteGenerator {
 }
 
 impl SiteGenerator {
-    pub fn new(site_dir: &Path, config: Option<Config>) -> Result<Self, Error> {
-        let config = match config {
-            Some(config) => config,
-            None => Config::load(site_dir)?,
-        };
-
-        // TODO - make all of these configurable in config.toml
-        let posts_dir = site_dir.join("posts");
-        let output_dir = site_dir.join(PathBuf::from(&config.build.output_dir));
-        let templates_dir = site_dir.join("templates");
-        let static_dir = site_dir.join("static");
+    pub fn new(config: &Config) -> Result<Self, Error> {
+        let posts_dir = config.posts_dir();
+        let output_dir = config.output_dir();
+        let templates_dir = config.templates_dir();
+        let static_dir = config.static_dir();
+        let site_dir = config.site_dir();
 
         fs::create_dir_all(&output_dir)?;
 
@@ -48,7 +43,8 @@ impl SiteGenerator {
             output_dir,
             static_dir,
             tera,
-            config,
+            // XXX - This feels clunky, maybe refactor?
+            config: config.clone(),
         })
     }
 
@@ -136,10 +132,9 @@ impl SiteGenerator {
 
                 fs::copy(entry.path(), &dest_path)?;
 
-                // TODO - implement verbosity in Config
-                // if self.config.build.verbose {
-                //     println!("Copied static file: {}", relative_path.display());
-                // }
+                if self.config.build.verbose {
+                    println!("Copied static file: {}", relative_path.display());
+                }
             }
         }
         Ok(())
@@ -193,7 +188,7 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
-    fn setup_test_site() -> Result<(TempDir, Config), Error> {
+    fn setup_test_site() -> Result<Config, Error> {
         let temp_dir = TempDir::new().unwrap();
         let site_dir = temp_dir.path();
 
@@ -243,7 +238,7 @@ mod tests {
             include_str!(concat!(env!("OUT_DIR"), "/templates/config.toml")),
         )?;
 
-        Ok((temp_dir, config))
+        Ok(config)
     }
     fn create_test_post(posts_dir: &Path, title: &str) -> Result<(), Error> {
         let date = Local::now().format("%Y-%m-%d");
@@ -270,8 +265,8 @@ This is a test post."#,
 
     #[test]
     fn test_new_site_generator() -> Result<(), Error> {
-        let (temp_dir, config) = setup_test_site()?;
-        let generator = SiteGenerator::new(temp_dir.path(), Some(config))?;
+        let config = setup_test_site()?;
+        let generator = SiteGenerator::new(&config)?;
 
         assert!(generator.posts_dir.exists());
         Ok(())
@@ -279,8 +274,8 @@ This is a test post."#,
 
     #[test]
     fn test_read_posts() -> Result<(), Error> {
-        let (temp_dir, config) = setup_test_site()?;
-        let generator = SiteGenerator::new(temp_dir.path(), Some(config))?;
+        let config = setup_test_site()?;
+        let generator = SiteGenerator::new(&config)?;
 
         create_test_post(&generator.posts_dir, "Test Post")?;
 
@@ -293,8 +288,8 @@ This is a test post."#,
 
     #[test]
     fn test_generate_post_page() -> Result<(), Error> {
-        let (temp_dir, config) = setup_test_site()?;
-        let generator = SiteGenerator::new(temp_dir.path(), Some(config))?;
+        let config = setup_test_site()?;
+        let generator = SiteGenerator::new(&config)?;
 
         create_test_post(&generator.posts_dir, "Test Post")?;
 
@@ -315,8 +310,8 @@ This is a test post."#,
 
     #[test]
     fn test_generate_index_page() -> Result<(), Error> {
-        let (temp_dir, config) = setup_test_site()?;
-        let generator = SiteGenerator::new(temp_dir.path(), Some(config))?;
+        let config = setup_test_site()?;
+        let generator = SiteGenerator::new(&config)?;
 
         create_test_post(&generator.posts_dir, "Test Post 1")?;
         create_test_post(&generator.posts_dir, "Test Post 2")?;
@@ -335,8 +330,8 @@ This is a test post."#,
 
     #[test]
     fn test_copy_static_assets() -> Result<(), Error> {
-        let (temp_dir, config) = setup_test_site()?;
-        let generator = SiteGenerator::new(temp_dir.path(), Some(config))?;
+        let config = setup_test_site()?;
+        let generator = SiteGenerator::new(&config)?;
 
         // Create a test static file
         let static_dir = generator.site_dir.join("static");
@@ -355,8 +350,8 @@ This is a test post."#,
 
     #[test]
     fn test_generate_site() -> Result<(), Error> {
-        let (temp_dir, config) = setup_test_site()?;
-        let generator = SiteGenerator::new(temp_dir.path(), Some(config))?;
+        let config = setup_test_site()?;
+        let generator = SiteGenerator::new(&config)?;
 
         create_test_post(&generator.posts_dir, "Test Post")?;
         generator.generate_site()?;

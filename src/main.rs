@@ -1,8 +1,10 @@
 #![deny(unused_crate_dependencies)]
 
+mod anthropic;
 mod config;
 mod errors;
 mod generator;
+mod git;
 mod init;
 mod post;
 mod serve;
@@ -13,9 +15,10 @@ use console::Style;
 use std::fs;
 use std::path::PathBuf;
 
-use crate::config::{BuildConfig, Config};
+use crate::config::Config;
 use crate::errors::Error;
 use crate::generator::SiteGenerator;
+use crate::git::open_editor;
 use crate::init::{create_directory_structure, validate_site_directory};
 use crate::post::create_new_post;
 use crate::serve::serve;
@@ -54,7 +57,18 @@ enum Commands {
         dir: PathBuf,
     },
     /// Create a new blog post
-    New { title: String },
+    New {
+        title: String,
+
+        #[arg(short, long = "target-dir", default_value = ".")]
+        dir: Option<PathBuf>,
+
+        #[arg(long, requires = "anthropic_key")]
+        prompt: Option<String>,
+
+        #[arg(long, env = "ANTHROPIC_API_KEY")]
+        anthropic_key: Option<String>,
+    },
     /// Serve the site locally
     Serve {
         #[arg(short, long = "target-dir", default_value = ".")]
@@ -68,7 +82,6 @@ enum Commands {
     },
     /// Build the site
     Build {
-        /// Path to the site directory
         #[arg(short, long = "target-dir", default_value = ".")]
         dir: Option<PathBuf>,
 
@@ -94,9 +107,22 @@ fn main() -> Result<(), Error> {
             create_directory_structure(&dir)?;
             println!("✨ Created new site at {}", &dir.display());
         }
-        Commands::New { title } => {
-            create_new_post(&title)?;
+        Commands::New {
+            title,
+            prompt,
+            anthropic_key,
+            dir,
+        } => {
+            let site_dir = dir.unwrap_or_else(|| PathBuf::from("."));
+            let config = Config::load(&site_dir)?;
+
+            let rt = tokio::runtime::Runtime::new()?;
+            let filepath = rt.block_on(async {
+                create_new_post(&config, &title, prompt, anthropic_key).await
+            })?;
             println!("📝 Created new post: {}", title);
+
+            open_editor(&filepath)?;
         }
         Commands::Build {
             dir,
@@ -104,21 +130,8 @@ fn main() -> Result<(), Error> {
             verbose,
         } => {
             let site_dir = dir.unwrap_or_else(|| PathBuf::from("."));
-            let absolute_site_dir = fs::canonicalize(&site_dir)?;
             let config = Config::load(&site_dir)?;
-
-            // Override output directory if specified
-            let config = if output_path != PathBuf::from("dist") {
-                Config {
-                    build: BuildConfig {
-                        output_dir: output_path.to_string_lossy().to_string(),
-                        ..config.build
-                    },
-                    ..config
-                }
-            } else {
-                config
-            };
+            let absolute_site_dir = fs::canonicalize(&site_dir)?;
 
             validate_site_directory(&absolute_site_dir)?;
 
@@ -135,7 +148,7 @@ fn main() -> Result<(), Error> {
 
             println!("{}", accent.apply_to("\nGenerating site..."));
 
-            let generator = SiteGenerator::new(&site_dir, Some(config))?;
+            let generator = SiteGenerator::new(&config)?;
             generator.generate_site()?;
 
             if verbose {

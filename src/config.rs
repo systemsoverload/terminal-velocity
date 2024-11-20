@@ -3,13 +3,16 @@ use serde::Deserialize;
 use serde::Serialize;
 use std::fs;
 use std::path::Path;
+use std::path::PathBuf;
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Config {
-    pub title: String,
-    pub description: String,
+    #[serde(skip)]
+    site_dir: PathBuf,
     #[serde(deserialize_with = "normalize_url")]
     pub base_url: String,
+    pub title: String,
+    pub description: String,
     pub author: Author,
     pub build: BuildConfig,
 }
@@ -22,11 +25,14 @@ pub struct Author {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct BuildConfig {
-    pub output_dir: String,
     #[serde(deserialize_with = "validate_port")]
     pub port: u16,
     #[serde(default)]
     pub verbose: bool,
+    pub output_dir: String,
+    pub posts_dir: String,
+    pub templates_dir: String,
+    pub static_dir: String,
 }
 
 impl Config {
@@ -35,15 +41,40 @@ impl Config {
 
         if config_path.exists() {
             let content = fs::read_to_string(config_path)?;
-            toml::from_str(&content).map_err(|e| Error::ConfigParse(e.to_string()))
+            let mut config: Config =
+                toml::from_str(&content).map_err(|e| Error::ConfigParse(e.to_string()))?;
+            config.site_dir = site_dir.to_path_buf();
+            Ok(config)
         } else {
             Ok(Self::default())
         }
     }
 
     pub fn default() -> Self {
+        // TODO - Probably be stricter here and just fail if the config doesnt exist on disk.
+        // This was useful for early dev, but will probably cause confusion for real use
         let default_config = include_str!(concat!(env!("OUT_DIR"), "/templates/config.toml"));
         toml::from_str(default_config).expect("Failed to parse default config")
+    }
+
+    pub fn site_dir(&self) -> &Path {
+        &self.site_dir
+    }
+
+    pub fn posts_dir(&self) -> PathBuf {
+        self.site_dir.join(&self.build.posts_dir)
+    }
+
+    pub fn output_dir(&self) -> PathBuf {
+        self.site_dir.join(&self.build.output_dir)
+    }
+
+    pub fn templates_dir(&self) -> PathBuf {
+        self.site_dir.join(&self.build.templates_dir)
+    }
+
+    pub fn static_dir(&self) -> PathBuf {
+        self.site_dir.join(&self.build.static_dir)
     }
 }
 

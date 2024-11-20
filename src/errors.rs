@@ -23,6 +23,12 @@ pub enum Error {
     #[error("Configuration parse error: {0}")]
     ConfigParse(String),
 
+    #[error("API error: {0}")]
+    Api(String),
+
+    #[error("Missing API key. Set ANTHROPIC_API_KEY environment variable or use --anthropic-key")]
+    MissingApiKey,
+
     #[error(transparent)]
     Other(#[from] Box<dyn std::error::Error + Send + Sync>),
 }

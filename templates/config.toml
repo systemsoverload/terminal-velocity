@@ -7,5 +7,10 @@ name = "Anonymous"
 email = "author@example.com"
 
 [build]
-output_dir = "dist"
 port = 8000
+verbose = true
+# The following are relative to the site path
+output_dir = "dist"
+posts_dir = "posts"
+templates_dir = "templates"
+static_dir = "static"

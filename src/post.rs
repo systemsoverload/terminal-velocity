@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crate::errors::Error;
 use chrono::{Local, NaiveDate};
 use serde::{Deserialize, Serialize};
@@ -70,7 +71,12 @@ pub fn slugify(text: &str) -> String {
         .join("-")
 }
 
-pub fn create_new_post(title: &str) -> Result<(), Error> {
+pub async fn create_new_post(
+    config: &Config,
+    title: &str,
+    prompt: Option<String>,
+    api_key: Option<String>,
+) -> Result<PathBuf, Error> {
     let date = Local::now().format("%Y-%m-%d");
     let slug = slugify(title);
 
@@ -80,7 +86,7 @@ pub fn create_new_post(title: &str) -> Result<(), Error> {
         ));
     }
 
-    let posts_dir = PathBuf::from("posts");
+    let posts_dir = config.posts_dir();
 
     if !posts_dir.exists() {
         fs::create_dir_all(&posts_dir)?;
@@ -88,6 +94,13 @@ pub fn create_new_post(title: &str) -> Result<(), Error> {
 
     let filename = format!("{}-{}.md", date, slug);
     let filepath = posts_dir.join(filename);
+
+    // Generate outline if requested
+    let outline = if let (Some(prompt), Some(key)) = (prompt, api_key) {
+        Some(crate::anthropic::generate_outline(&prompt, &key).await?)
+    } else {
+        None
+    };
 
     let template = format!(
         r#"---
@@ -99,11 +112,20 @@ preview: "Add a preview of your post here"
 slug: "{}"
 ---
 
-Write your post content here...
-"#,
-        title, date, slug
+{}
+
+{}"#,
+        title,
+        date,
+        slug,
+        outline.as_ref().unwrap_or(&String::new()),
+        if outline.is_some() {
+            "<!-- Generated outline above. Replace with your content. -->"
+        } else {
+            "Write your post content here..."
+        }
     );
 
-    fs::write(filepath, template)?;
-    Ok(())
+    fs::write(filepath.clone(), template)?;
+    Ok(filepath)
 }

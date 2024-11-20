@@ -154,17 +154,22 @@ Your post content here...
 The `config.toml` file contains your site's configuration:
 
 ```toml
-title = "Your Site Title"
-description = "Your site description"
-base_url = "https://your-site.com"
+title = "My Terminal Velocity Blog"
+description = "A blazingly fast tech blog"
+base_url = "http://localhost:8000"
 
 [author]
-name = "Your Name"
-email = "your@email.com"
+name = "Anonymous"
+email = "author@example.com"
 
 [build]
+port = 8000
+verbose = true
+# Relative to the site directory
 output_dir = "dist"
-port = 8080
+posts_dir = "posts"
+templates_dir = "templates"
+static_dir = "static"
 ```
 
 ## Development
