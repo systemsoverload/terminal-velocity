@@ -1,6 +1,6 @@
+use std::process::Command;
 use std::time::Duration;
 use std::time::Instant;
-use std::process::Command;
 
 use actix_files::Files;
 use actix_web::middleware::Logger;
@@ -38,7 +38,8 @@ impl Server {
                 if let Ok(event) = res {
                     let _ = tx.send(event);
                 }
-            }).unwrap();
+            })
+            .unwrap();
 
             // Watch relevant directories
             for dir in ["posts", "templates", "static"].iter() {
@@ -68,7 +69,7 @@ impl Server {
                             Ok(status) if status.success() => {
                                 println!("✨ Site rebuilt successfully!");
                                 last_build = Instant::now();
-                            },
+                            }
                             Ok(status) => eprintln!("Build failed with status: {}", status),
                             Err(e) => eprintln!("Failed to execute build: {}", e),
                         }
@@ -97,7 +98,11 @@ impl Server {
     }
 }
 
-pub fn serve(dist_dir: PathBuf, port: u16, hot_reload: bool) -> Result<(), Box<dyn std::error::Error>> {
+pub fn serve(
+    dist_dir: PathBuf,
+    port: u16,
+    hot_reload: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
     if !dist_dir.exists() {
         return Err(format!(
             "Directory not found: {}. Run `term-v build` first.",
