@@ -8,7 +8,7 @@ use std::path::PathBuf;
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct Config {
     #[serde(skip)]
-    site_dir: PathBuf,
+    pub site_dir: PathBuf,
     #[serde(deserialize_with = "normalize_url")]
     pub base_url: String,
     pub title: String,
@@ -55,10 +55,6 @@ impl Config {
         // This was useful for early dev, but will probably cause confusion for real use
         let default_config = include_str!(concat!(env!("OUT_DIR"), "/templates/config.toml"));
         toml::from_str(default_config).expect("Failed to parse default config")
-    }
-
-    pub fn site_dir(&self) -> &Path {
-        &self.site_dir
     }
 
     pub fn posts_dir(&self) -> PathBuf {

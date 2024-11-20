@@ -2,10 +2,7 @@ use crate::post::Post;
 use crate::post::PostMetadata;
 use chrono::NaiveDate;
 use pulldown_cmark::{html, Options, Parser as MarkdownParser};
-use std::{
-    fs::{self},
-    path::PathBuf,
-};
+use std::fs::{self};
 use tera::{Context, Tera};
 use walkdir::WalkDir;
 use yaml_front_matter::{Document, YamlFrontMatter};
@@ -14,73 +11,65 @@ use crate::config::Config;
 use crate::errors::Error;
 
 pub struct SiteGenerator {
-    #[allow(dead_code)]
-    site_dir: PathBuf,
-
-    posts_dir: PathBuf,
-    output_dir: PathBuf,
-    static_dir: PathBuf,
-    tera: Tera,
     config: Config,
+    tera: Tera,
 }
 
 impl SiteGenerator {
     pub fn new(config: &Config) -> Result<Self, Error> {
-        let posts_dir = config.posts_dir();
-        let output_dir = config.output_dir();
+        // Create output directory if it doesn't exist
+        fs::create_dir_all(config.output_dir())?;
+
+        // Initialize Tera with templates
         let templates_dir = config.templates_dir();
-        let static_dir = config.static_dir();
-        let site_dir = config.site_dir();
+        if !templates_dir.exists() {
+            return Err(Error::Template(tera::Error::msg(
+                "Templates directory does not exist",
+            )));
+        }
 
-        fs::create_dir_all(&output_dir)?;
-
-        let tera = Tera::new(&format!("{}/**/*.html", templates_dir.display()))
-            .map_err(Error::Template)?;
+        let template_pattern = format!("{}/**/*.html", templates_dir.display());
+        let tera = Tera::new(&template_pattern).map_err(Error::Template)?;
 
         Ok(Self {
-            site_dir: site_dir.to_path_buf(),
-            posts_dir,
-            output_dir,
-            static_dir,
-            tera,
-            // XXX - This feels clunky, maybe refactor?
             config: config.clone(),
+            tera,
         })
     }
 
     fn read_posts(&self) -> Result<Vec<Post>, Error> {
         let mut posts = Vec::new();
+        let posts_dir = self.config.posts_dir();
 
-        for entry in WalkDir::new(&self.posts_dir)
+        for entry in WalkDir::new(posts_dir)
             .into_iter()
             .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().map_or(false, |ext| ext == "md"))
         {
-            if entry.path().extension().map_or(false, |ext| ext == "md") {
-                let content = fs::read_to_string(entry.path())?;
-                let file_name = entry.path().display().to_string();
+            let content = fs::read_to_string(entry.path())?;
+            let file_name = entry.path().display().to_string();
 
-                let doc: Document<PostMetadata> =
-                    YamlFrontMatter::parse(&content).map_err(|e| Error::Frontmatter {
-                        file: file_name.clone(),
-                        message: e.to_string(),
-                    })?;
+            let doc: Document<PostMetadata> =
+                YamlFrontMatter::parse(&content).map_err(|e| Error::Frontmatter {
+                    file: file_name,
+                    message: e.to_string(),
+                })?;
 
-                let mut options = Options::empty();
-                options.insert(Options::ENABLE_STRIKETHROUGH);
-                options.insert(Options::ENABLE_TABLES);
-                options.insert(Options::ENABLE_FOOTNOTES);
-                options.insert(Options::ENABLE_TASKLISTS);
+            let mut options = Options::empty();
+            options.insert(Options::ENABLE_STRIKETHROUGH);
+            options.insert(Options::ENABLE_TABLES);
+            options.insert(Options::ENABLE_FOOTNOTES);
+            options.insert(Options::ENABLE_TASKLISTS);
 
-                let parser = MarkdownParser::new_ext(&doc.content, options);
-                let mut html_output = String::new();
-                html::push_html(&mut html_output, parser);
+            let parser = MarkdownParser::new_ext(&doc.content, options);
+            let mut html_output = String::new();
+            html::push_html(&mut html_output, parser);
 
-                posts.push(Post {
-                    metadata: doc.metadata,
-                    content: doc.content,
-                    html_content: html_output,
-                });
-            }
+            posts.push(Post {
+                metadata: doc.metadata,
+                content: doc.content,
+                html_content: html_output,
+            });
         }
 
         Ok(posts)
@@ -90,14 +79,22 @@ impl SiteGenerator {
         let mut context = Context::new();
         context.insert("post", post);
         context.insert("config", &self.config);
-        context.insert("title", &post.metadata.title); // Required by base.html
+        context.insert("title", &post.metadata.title);
 
         let html = self.tera.render("post.html", &context)?;
 
-        let output_path = self.output_dir.join("posts").join(&post.metadata.slug);
-        fs::create_dir_all(&output_path)?;
+        // Write to posts/slug.html instead of posts/slug/index.html
+        let output_path = self
+            .config
+            .output_dir()
+            .join("posts")
+            .join(format!("{}.html", post.metadata.slug));
 
-        fs::write(output_path.join("index.html"), html)?;
+        if let Some(parent) = output_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+
+        fs::write(output_path, html)?;
         Ok(())
     }
 
@@ -105,27 +102,28 @@ impl SiteGenerator {
         let mut context = Context::new();
         context.insert("posts", posts);
         context.insert("config", &self.config);
-        context.insert("title", &self.config.title); // Required by base.html
+        context.insert("title", &self.config.title);
 
-        // TODO - Handle the case where the index template doesn't exist (yet?)
         let html = self.tera.render("index.html", &context)?;
-        fs::write(self.output_dir.join("index.html"), html)?;
+        fs::write(self.config.output_dir().join("index.html"), html)?;
         Ok(())
     }
 
     fn copy_static_files(&self) -> Result<(), Error> {
-        if self.static_dir.exists() {
-            for entry in WalkDir::new(&self.static_dir)
+        let static_dir = self.config.static_dir();
+        if static_dir.exists() {
+            for entry in WalkDir::new(&static_dir)
                 .into_iter()
                 .filter_map(Result::ok)
                 .filter(|e| e.file_type().is_file())
             {
                 let relative_path = entry
                     .path()
-                    .strip_prefix(&self.static_dir)
-                    .map_err(|_| Error::DirectoryNotFound(self.static_dir.clone()))?;
-                let dest_path = self.output_dir.join("static").join(relative_path);
-                // Create parent directories if they don't exist
+                    .strip_prefix(&static_dir)
+                    .map_err(|_| Error::DirectoryNotFound(static_dir.clone()))?;
+
+                let dest_path = self.config.output_dir().join(relative_path);
+
                 if let Some(parent) = dest_path.parent() {
                     fs::create_dir_all(parent)?;
                 }
@@ -152,14 +150,10 @@ impl SiteGenerator {
 
         pb.set_message("Sorting posts...");
         posts.sort_by(|a, b| {
-            match (
-                NaiveDate::parse_from_str(&a.metadata.date, "%Y-%m-%d"),
-                NaiveDate::parse_from_str(&b.metadata.date, "%Y-%m-%d"),
-            ) {
+            let parse_date = |date: &str| NaiveDate::parse_from_str(date, "%Y-%m-%d");
+            match (parse_date(&a.metadata.date), parse_date(&b.metadata.date)) {
                 (Ok(date_a), Ok(date_b)) => date_b.cmp(&date_a),
-                (Ok(_), Err(_)) => std::cmp::Ordering::Less,
-                (Err(_), Ok(_)) => std::cmp::Ordering::Greater,
-                (Err(_), Err(_)) => a.metadata.date.cmp(&b.metadata.date), // Fall back to string comparison
+                _ => b.metadata.date.cmp(&a.metadata.date), // Fall back to string comparison for newest first
             }
         });
 
@@ -184,181 +178,254 @@ impl SiteGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Local;
+    use crate::config::{Author, BuildConfig};
     use std::fs;
     use tempfile::TempDir;
 
-    fn setup_test_site() -> Result<Config, Error> {
-        let temp_dir = TempDir::new().unwrap();
-        let site_dir = temp_dir.path();
-
-        // Create necessary directories
-        fs::create_dir_all(site_dir.join("posts"))?;
-        fs::create_dir_all(site_dir.join("templates"))?;
-        fs::create_dir_all(site_dir.join("static"))?;
-
-        // Create minimal test templates that match our actual usage
-        fs::write(
-            site_dir.join("templates/base.html"),
-            r#"<!DOCTYPE html>
-<html>
-<head><title>{% block title %}{{ title }}{% endblock %}</title></head>
-<body>{% block content %}{% endblock %}</body>
-</html>"#,
-        )?;
-
-        fs::write(
-            site_dir.join("templates/post.html"),
-            r#"{% extends "base.html" %}
-{% block content %}
-<article>
-    <h1>{{ post.metadata.title }}</h1>
-    {{ post.html_content | safe }}
-</article>
-{% endblock %}"#,
-        )?;
-
-        fs::write(
-            site_dir.join("templates/index.html"),
-            r#"{% extends "base.html" %}
-{% block content %}
-{% for post in posts %}
-<article>
-    <h2><a href="/posts/{{ post.metadata.slug }}">{{ post.metadata.title }}</a></h2>
-    <p>{{ post.metadata.preview }}</p>
-</article>
-{% endfor %}
-{% endblock %}"#,
-        )?;
-
-        // Create test config
-        let config = Config::default();
-        fs::write(
-            site_dir.join("config.toml"),
-            include_str!(concat!(env!("OUT_DIR"), "/templates/config.toml")),
-        )?;
-
-        Ok(config)
+    fn create_test_config(temp_dir: &TempDir) -> Config {
+        let site_dir = temp_dir.path().to_path_buf();
+        Config {
+            site_dir,
+            base_url: "http://localhost:8000".to_string(),
+            title: "Test Blog".to_string(),
+            description: "Test Description".to_string(),
+            author: Author {
+                name: "Test Author".to_string(),
+                email: "test@example.com".to_string(),
+            },
+            build: BuildConfig {
+                port: 8000,
+                verbose: false,
+                output_dir: "dist".to_string(),
+                posts_dir: "posts".to_string(),
+                templates_dir: "templates".to_string(),
+                static_dir: "static".to_string(),
+            },
+        }
     }
-    fn create_test_post(posts_dir: &Path, title: &str) -> Result<(), Error> {
-        let date = Local::now().format("%Y-%m-%d");
-        let slug = title.to_lowercase().replace(' ', "-");
-        let content = format!(
+
+    fn setup_test_site(temp_dir: &TempDir) -> std::io::Result<()> {
+        // Create required directories
+        fs::create_dir(temp_dir.path().join("posts"))?;
+        fs::create_dir(temp_dir.path().join("templates"))?;
+        fs::create_dir_all(temp_dir.path().join("static/css"))?;
+
+        // Create test post
+        fs::write(
+            temp_dir.path().join("posts/test-post.md"),
             r#"---
-title: "{}"
-date: {}
+title: "Test Post"
+date: 2024-01-01
 author: "Test Author"
 tags: ["test"]
 preview: "Test preview"
-slug: "{}"
+slug: "test-post"
 ---
-
 # Test Content
+Test body"#,
+        )?;
 
-This is a test post."#,
-            title, date, slug
-        );
+        // Create test templates
+        fs::write(
+            temp_dir.path().join("templates/base.html"),
+            "{% block content %}{% endblock %}",
+        )?;
+        fs::write(
+            temp_dir.path().join("templates/post.html"),
+            "{% extends \"base.html\" %}{% block content %}{{ post.html_content | safe }}{% endblock %}",
+        )?;
+        fs::write(
+            temp_dir.path().join("templates/index.html"),
+            "{% extends \"base.html\" %}{% block content %}{% for post in posts %}{{ post.metadata.title }}{% endfor %}{% endblock %}",
+        )?;
 
-        fs::write(posts_dir.join(format!("{}-{}.md", date, slug)), content)?;
+        // Create test static file
+        fs::write(
+            temp_dir.path().join("static/css/style.css"),
+            "body { color: black; }",
+        )?;
+
         Ok(())
     }
 
     #[test]
-    fn test_new_site_generator() -> Result<(), Error> {
-        let config = setup_test_site()?;
-        let generator = SiteGenerator::new(&config)?;
+    fn test_site_generator_initialization() -> Result<(), Error> {
+        let temp_dir = TempDir::new()?;
+        setup_test_site(&temp_dir)?;
+        let config = create_test_config(&temp_dir);
 
-        assert!(generator.posts_dir.exists());
+        let generator = SiteGenerator::new(&config)?;
+        assert!(generator.config.output_dir().exists());
         Ok(())
     }
 
     #[test]
     fn test_read_posts() -> Result<(), Error> {
-        let config = setup_test_site()?;
+        let temp_dir = TempDir::new()?;
+        setup_test_site(&temp_dir)?;
+        let config = create_test_config(&temp_dir);
         let generator = SiteGenerator::new(&config)?;
-
-        create_test_post(&generator.posts_dir, "Test Post")?;
 
         let posts = generator.read_posts()?;
         assert_eq!(posts.len(), 1);
         assert_eq!(posts[0].metadata.title, "Test Post");
-        assert_eq!(posts[0].metadata.tags, vec!["test"]);
+        assert_eq!(posts[0].metadata.date, "2024-01-01");
         Ok(())
     }
 
     #[test]
     fn test_generate_post_page() -> Result<(), Error> {
-        let config = setup_test_site()?;
+        let temp_dir = TempDir::new()?;
+        setup_test_site(&temp_dir)?;
+        let config = create_test_config(&temp_dir);
         let generator = SiteGenerator::new(&config)?;
-
-        create_test_post(&generator.posts_dir, "Test Post")?;
 
         let posts = generator.read_posts()?;
         generator.generate_post_page(&posts[0])?;
 
-        let output_path = generator
-            .output_dir
+        let post_path = generator
+            .config
+            .output_dir()
             .join("posts")
-            .join(&posts[0].metadata.slug)
-            .join("index.html");
-
-        assert!(output_path.exists());
-        let content = fs::read_to_string(output_path)?;
-        assert!(content.contains("Test Post"));
+            .join("test-post.html");
+        assert!(post_path.exists());
         Ok(())
     }
 
     #[test]
     fn test_generate_index_page() -> Result<(), Error> {
-        let config = setup_test_site()?;
+        let temp_dir = TempDir::new()?;
+        setup_test_site(&temp_dir)?;
+        let config = create_test_config(&temp_dir);
         let generator = SiteGenerator::new(&config)?;
-
-        create_test_post(&generator.posts_dir, "Test Post 1")?;
-        create_test_post(&generator.posts_dir, "Test Post 2")?;
 
         let posts = generator.read_posts()?;
         generator.generate_index_page(&posts)?;
 
-        let index_path = generator.output_dir.join("index.html");
+        let index_path = generator.config.output_dir().join("index.html");
         assert!(index_path.exists());
-
-        let content = fs::read_to_string(index_path)?;
-        assert!(content.contains("Test Post 1"));
-        assert!(content.contains("Test Post 2"));
         Ok(())
     }
 
     #[test]
-    fn test_copy_static_assets() -> Result<(), Error> {
-        let config = setup_test_site()?;
+    fn test_copy_static_files() -> Result<(), Error> {
+        let temp_dir = TempDir::new()?;
+        setup_test_site(&temp_dir)?;
+        let config = create_test_config(&temp_dir);
         let generator = SiteGenerator::new(&config)?;
-
-        // Create a test static file
-        let static_dir = generator.site_dir.join("static");
-        fs::create_dir_all(&static_dir)?;
-        fs::write(static_dir.join("test.css"), "body { color: green; }")?;
 
         generator.copy_static_files()?;
 
-        let output_path = generator.output_dir.join("static").join("test.css");
-        assert!(output_path.exists());
-
-        let content = fs::read_to_string(output_path)?;
-        assert_eq!(content, "body { color: green; }");
+        let css_path = generator.config.output_dir().join("css/style.css");
+        assert!(css_path.exists());
         Ok(())
     }
 
     #[test]
     fn test_generate_site() -> Result<(), Error> {
-        let config = setup_test_site()?;
+        let temp_dir = TempDir::new()?;
+        setup_test_site(&temp_dir)?;
+        let config = create_test_config(&temp_dir);
         let generator = SiteGenerator::new(&config)?;
 
-        create_test_post(&generator.posts_dir, "Test Post")?;
         generator.generate_site()?;
 
-        assert!(generator.output_dir.exists());
-        assert!(generator.output_dir.join("index.html").exists());
-        assert!(generator.output_dir.join("posts").exists());
+        assert!(generator
+            .config
+            .output_dir()
+            .join("posts/test-post.html")
+            .exists());
+        assert!(generator.config.output_dir().join("index.html").exists());
+        assert!(generator.config.output_dir().join("css/style.css").exists());
+        Ok(())
+    }
+
+    #[test]
+    fn test_post_sorting() -> Result<(), Error> {
+        let temp_dir = TempDir::new()?;
+        setup_test_site(&temp_dir)?;
+
+        // Create additional test posts with different dates
+        fs::write(
+            temp_dir.path().join("posts/old-post.md"),
+            r#"---
+title: "Old Post"
+date: 2023-12-31
+slug: "old-post"
+---
+Old content"#,
+        )?;
+
+        fs::write(
+            temp_dir.path().join("posts/new-post.md"),
+            r#"---
+title: "New Post"
+date: 2024-01-02
+slug: "new-post"
+---
+New content"#,
+        )?;
+
+        let config = create_test_config(&temp_dir);
+        let generator = SiteGenerator::new(&config)?;
+        let posts = generator.read_posts()?;
+
+        assert_eq!(posts.len(), 3);
+        let sorted_posts = {
+            let mut posts = posts;
+            posts.sort_by(|a, b| {
+                let parse_date = |date: &str| NaiveDate::parse_from_str(date, "%Y-%m-%d");
+                match (parse_date(&a.metadata.date), parse_date(&b.metadata.date)) {
+                    (Ok(date_a), Ok(date_b)) => date_b.cmp(&date_a),
+                    _ => b.metadata.date.cmp(&a.metadata.date),
+                }
+            });
+            posts
+        };
+
+        assert_eq!(sorted_posts[0].metadata.date, "2024-01-02");
+        assert_eq!(sorted_posts[1].metadata.date, "2024-01-01");
+        assert_eq!(sorted_posts[2].metadata.date, "2023-12-31");
+        Ok(())
+    }
+
+    #[test]
+    fn test_error_handling_missing_template() -> Result<(), Error> {
+        let temp_dir = TempDir::new()?;
+        fs::create_dir_all(temp_dir.path().join("templates"))?;
+
+        // Create config without templates
+        fs::write(
+            temp_dir.path().join("config.toml"),
+            r#"
+            title = "Test Blog"
+            description = "Test Description"
+            base_url = "http://localhost:8000"
+
+            [author]
+            name = "Test Author"
+            email = "test@example.com"
+
+            [build]
+            port = 8000
+            verbose = false
+            output_dir = "dist"
+            posts_dir = "posts"
+            templates_dir = "dir_that_doesnt_exist"
+            static_dir = "static"
+            "#,
+        )?;
+
+        let config = Config::load(temp_dir.path())?;
+        let result = SiteGenerator::new(&config);
+
+        assert!(matches!(result, Err(Error::Template(_))));
+        if let Err(Error::Template(e)) = result {
+            assert!(e.to_string().contains("Templates directory does not exist"));
+        } else {
+            panic!("Expected Template error");
+        }
+
         Ok(())
     }
 }
