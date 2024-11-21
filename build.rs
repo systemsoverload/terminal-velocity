@@ -23,6 +23,7 @@ fn main() {
         "index.html",
         "post.html",
         "style.css",
+        "terminal_velocity.png",
     ];
 
     // Copy each template file

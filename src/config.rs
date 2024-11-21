@@ -33,6 +33,12 @@ pub struct BuildConfig {
     pub posts_dir: String,
     pub templates_dir: String,
     pub static_dir: String,
+    #[serde(default = "default_post_assets_dir")]
+    pub post_assets_dir: String,
+}
+
+fn default_post_assets_dir() -> String {
+    "assets".to_string()
 }
 
 impl Config {

@@ -8,6 +8,7 @@ pub fn create_directory_structure(path: &PathBuf) -> Result<(), Error> {
     let dirs = [
         path,
         &path.join("posts"),
+        &path.join("posts/example/assets"),
         &path.join("templates"),
         &path.join("static"),
         &path.join("static/css"),
@@ -46,7 +47,7 @@ pub fn create_directory_structure(path: &PathBuf) -> Result<(), Error> {
 
     // Create example post
     fs::write(
-        path.join("posts/example.md"),
+        path.join("posts/example/example.md"),
         include_str!(concat!(env!("OUT_DIR"), "/templates/example.md")),
     )?;
 
@@ -54,6 +55,12 @@ pub fn create_directory_structure(path: &PathBuf) -> Result<(), Error> {
     fs::write(
         path.join("config.toml"),
         include_str!(concat!(env!("OUT_DIR"), "/templates/config.toml")),
+    )?;
+
+    // Create sample post assset
+    fs::write(
+        path.join("posts/example/assets/terminal_velocity.png"),
+        include_bytes!(concat!(env!("OUT_DIR"), "/templates/terminal_velocity.png")),
     )?;
 
     // Create .gitignore

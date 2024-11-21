@@ -106,7 +106,7 @@ pub fn serve(
 
     if !output_dir.exists() {
         return Err(format!(
-            "Output directory not found: {}. Run `term-v build` first.",
+            "Output directory not found: {}. Run `termv build` first.",
             output_dir.display()
         )
         .into());

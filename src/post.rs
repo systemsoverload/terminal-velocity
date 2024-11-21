@@ -12,6 +12,50 @@ pub struct Post {
     pub html_content: String,
 }
 
+impl Post {
+    // Get the assets directory for this post
+    pub fn assets_dir(&self, config: &Config) -> PathBuf {
+        config.posts_dir()
+            .join(&self.metadata.slug)
+            .join(&config.build.post_assets_dir)
+    }
+
+    // Get the output directory for this post's assets
+    pub fn assets_output_dir(&self, config: &Config) -> PathBuf {
+        config.output_dir()
+            .join("posts")
+            .join(&self.metadata.slug)
+            .join(&config.build.post_assets_dir)
+    }
+
+    // Process post content to update asset paths
+    pub fn process_asset_paths(&mut self, config: &Config) {
+        // Update markdown image/video paths to point to the correct output location
+        let post_url = format!("/posts/{}", self.metadata.slug);
+
+        // Replace relative asset paths with absolute paths
+        let content = self.content.replace(
+            &format!("./{}/", config.build.post_assets_dir),
+            &format!("{}/{}/", post_url, config.build.post_assets_dir)
+        );
+        self.content = content.replace(
+            &format!("./{}", config.build.post_assets_dir),
+            &format!("{}/{}", post_url, config.build.post_assets_dir)
+        );
+
+        // Also update the HTML content
+        let html_content = self.html_content.replace(
+            &format!("./{}/", config.build.post_assets_dir),
+            &format!("{}/{}/", post_url, config.build.post_assets_dir)
+        );
+        self.html_content = html_content.replace(
+            &format!("./{}", config.build.post_assets_dir),
+            &format!("{}/{}", post_url, config.build.post_assets_dir)
+        );
+    }
+}
+
+
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct PostMetadata {
     pub title: String,
@@ -87,10 +131,12 @@ pub async fn create_new_post(
     }
 
     let posts_dir = config.posts_dir();
+    let assets_dir = posts_dir.join(&config.build.post_assets_dir);
 
     if !posts_dir.exists() {
         fs::create_dir_all(&posts_dir)?;
     }
+    fs::create_dir_all(&assets_dir)?;
 
     let filename = format!("{}-{}.md", date, slug);
     let filepath = posts_dir.join(filename);
@@ -202,6 +248,7 @@ mod tests {
                 posts_dir: "posts".to_string(),
                 templates_dir: "templates".to_string(),
                 static_dir: "static".to_string(),
+                post_assets_dir: "assets".to_string()
             },
         };
 
@@ -239,6 +286,7 @@ mod tests {
                 posts_dir: "posts".to_string(),
                 templates_dir: "templates".to_string(),
                 static_dir: "static".to_string(),
+                post_assets_dir: "assets".to_string()
             },
         };
 
