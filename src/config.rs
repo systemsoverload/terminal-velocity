@@ -25,8 +25,6 @@ pub struct Author {
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
 pub struct BuildConfig {
-    #[serde(deserialize_with = "validate_port")]
-    pub port: u16,
     #[serde(default)]
     pub verbose: bool,
     pub output_dir: String,
@@ -35,6 +33,18 @@ pub struct BuildConfig {
     pub static_dir: String,
     #[serde(default = "default_post_assets_dir")]
     pub post_assets_dir: String,
+    #[serde(deserialize_with = "validate_port")]
+    #[serde(default = "default_port")]
+    pub port: u16,
+    #[serde(default = "default_hot_reload")]
+    pub hot_reload: bool,
+}
+fn default_hot_reload() -> bool {
+    true
+}
+
+fn default_port() -> u16 {
+    8080
 }
 
 fn default_post_assets_dir() -> String {
@@ -68,7 +78,19 @@ impl Config {
     }
 
     pub fn output_dir(&self) -> PathBuf {
-        self.site_dir.join(&self.build.output_dir)
+        if Path::new(&self.build.output_dir).is_absolute() {
+            PathBuf::from(&self.build.output_dir)
+        } else {
+            self.site_dir.join(&self.build.output_dir)
+        }
+    }
+
+    pub fn set_output_dir<P: AsRef<Path>>(&mut self, path: P) {
+        self.build.output_dir = path
+            .as_ref()
+            .to_str()
+            .expect("Invalid output path")
+            .to_string();
     }
 
     pub fn templates_dir(&self) -> PathBuf {

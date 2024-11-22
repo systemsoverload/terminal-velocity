@@ -2,7 +2,7 @@ use actix_files::Files;
 use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpResponse, HttpServer};
 use notify::{RecursiveMode, Watcher};
-use std::path::PathBuf;
+
 use std::process::Command;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
@@ -10,25 +10,20 @@ use std::time::{Duration, Instant};
 use crate::config::Config;
 
 pub struct Server {
-    site_dir: PathBuf,
-    output_dir: PathBuf,
-    hot_reload: bool,
-    port: u16,
+    config: Config,
 }
 
 impl Server {
-    pub fn new(site_dir: PathBuf, output_dir: PathBuf, port: u16, hot_reload: bool) -> Self {
-        Self {
-            site_dir,
-            output_dir,
-            hot_reload,
-            port,
-        }
+    pub fn new(config: Config) -> Self {
+        Self { config }
     }
 
     pub async fn run(self) -> std::io::Result<()> {
-        println!("Starting server on http://localhost:{}", self.port);
-        if self.hot_reload {
+        println!(
+            "Starting server on http://localhost:{}",
+            self.config.build.port
+        );
+        if self.config.build.hot_reload {
             let (tx, rx) = mpsc::channel();
 
             let mut watcher = notify::recommended_watcher(move |res| {
@@ -40,7 +35,7 @@ impl Server {
 
             // Watch relevant directories
             for dir in ["posts", "templates", "static"].iter() {
-                let path = self.site_dir.join(dir);
+                let path = self.config.site_dir.join(dir);
                 if path.exists() && watcher.watch(&path, RecursiveMode::Recursive).is_ok() {
                     println!("Watching directory: {}", path.display());
                 }
@@ -60,7 +55,7 @@ impl Server {
                         match Command::new("termv")
                             .arg("build")
                             .arg("-d")
-                            .arg(&self.site_dir)
+                            .arg(&self.config.site_dir)
                             .status()
                         {
                             Ok(status) if status.success() => {
@@ -79,7 +74,7 @@ impl Server {
             App::new()
                 .wrap(Logger::default())
                 .service(
-                    Files::new("/", self.output_dir.clone())
+                    Files::new("/", self.config.build.output_dir.clone())
                         .index_file("index.html")
                         .use_last_modified(true)
                         .use_etag(true),
@@ -89,20 +84,15 @@ impl Server {
                         .to(|| async { HttpResponse::NotFound().body("404 - Page not found") }),
                 )
         })
-        .bind(("127.0.0.1", self.port))?
+        .bind(("127.0.0.1", self.config.build.port))?
         .run()
         .await
     }
 }
 
-pub fn serve(
-    site_dir: PathBuf,
-    port: u16,
-    hot_reload: bool,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let config = Config::load(&site_dir)?;
+pub fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
     // Always consider the output dir to be relative to the site dir
-    let output_dir = site_dir.join(config.build.output_dir);
+    let output_dir = config.output_dir();
 
     if !output_dir.exists() {
         return Err(format!(
@@ -112,7 +102,7 @@ pub fn serve(
         .into());
     }
 
-    let server = Server::new(site_dir, output_dir, port, hot_reload);
+    let server = Server::new(config);
     let runtime = tokio::runtime::Runtime::new()?;
     runtime.block_on(server.run())?;
     Ok(())

@@ -48,8 +48,6 @@ struct Cli {
     command: Commands,
 }
 
-// TODO - untangle the spaghetti that is target dir, dist dir, etc by referring to the config.toml instead
-
 #[derive(Subcommand)]
 enum Commands {
     /// Initialize a new blog
@@ -69,30 +67,34 @@ enum Commands {
 
         #[arg(long, env = "ANTHROPIC_API_KEY")]
         anthropic_key: Option<String>,
+
+        #[arg(short, long)]
+        author: Option<String>,
     },
     /// Serve the site locally
     Serve {
         #[arg(short, long = "target-dir", default_value = ".")]
         dir: Option<PathBuf>,
 
-        #[arg(long, default_value_t = 8080)]
-        port: u16,
+        #[arg(long)]
+        port: Option<u16>,
 
         #[arg(long)]
-        hot_reload: bool,
+        hot_reload: Option<bool>,
+
+        #[arg(short, long)]
+        verbose: Option<bool>,
     },
     /// Build the site
     Build {
         #[arg(short, long = "target-dir", default_value = ".")]
         dir: Option<PathBuf>,
 
-        /// Output directory for the generated site
-        #[arg(short, long, default_value = "dist")]
-        output_path: PathBuf,
-
-        /// Show verbose output
         #[arg(short, long)]
-        verbose: bool,
+        output_path: Option<PathBuf>,
+
+        #[arg(short, long)]
+        verbose: Option<bool>,
     },
 }
 
@@ -113,9 +115,16 @@ fn main() -> Result<(), Error> {
             prompt,
             anthropic_key,
             dir,
+            author,
         } => {
             let site_dir = dir.unwrap_or_else(|| PathBuf::from("."));
-            let config = Config::load(&site_dir)?;
+            let mut config = Config::load(&site_dir)?;
+            config.site_dir = fs::canonicalize(&site_dir)?;
+
+            // Override author if provided
+            if let Some(cli_author) = author {
+                config.author.name = cli_author;
+            }
 
             let rt = tokio::runtime::Runtime::new()?;
             let filepath = rt.block_on(async {
@@ -131,20 +140,32 @@ fn main() -> Result<(), Error> {
             verbose,
         } => {
             let site_dir = dir.unwrap_or_else(|| PathBuf::from("."));
-            let config = Config::load(&site_dir)?;
-            let absolute_site_dir = fs::canonicalize(&site_dir)?;
+            let mut config = Config::load(&site_dir)?;
+            config.site_dir = fs::canonicalize(&site_dir)?;
 
-            validate_site_directory(&absolute_site_dir)?;
+            // Override config with CLI args if provided
+            if let Some(path) = output_path {
+                // If the path is absolute, use it as-is
+                // If relative, make it relative to the current working directory, not the site dir
+                let output_dir = if path.is_absolute() {
+                    path
+                } else {
+                    std::env::current_dir()?.join(path)
+                };
+                config.set_output_dir(output_dir);
+            }
 
-            let posts_dir = absolute_site_dir.join("posts");
-            let templates_dir = absolute_site_dir.join("templates");
-            let output_dir = output_path;
+            if let Some(v) = verbose {
+                config.build.verbose = v;
+            }
 
-            if verbose {
-                println!("Site directory: {}", absolute_site_dir.display());
-                println!("Posts directory: {}", posts_dir.display());
-                println!("Templates directory: {}", templates_dir.display());
-                println!("Output directory: {}", output_dir.display());
+            validate_site_directory(&config.site_dir)?;
+
+            if config.build.verbose {
+                println!("Site directory: {}", config.site_dir.display());
+                println!("Posts directory: {}", config.posts_dir().display());
+                println!("Templates directory: {}", config.templates_dir().display());
+                println!("Output directory: {}", config.output_dir().display());
             }
 
             println!("{}", accent.apply_to("\nGenerating site..."));
@@ -152,23 +173,41 @@ fn main() -> Result<(), Error> {
             let generator = SiteGenerator::new(&config)?;
             generator.generate_site()?;
 
-            if verbose {
-                println!("\nSite generation complete!");
-                println!("Output directory: {}", output_dir.display());
-                println!("You can serve the site locally with:");
-                println!("  termv serv --directory {}", output_dir.display());
+            println!(
+            "{}",
+            accent.apply_to(if config.build.verbose {
+                format!(
+                    "\nSite generation complete!\nOutput directory: {}\nYou can serve the site locally with:\n  termv serve --directory {}",
+                    config.output_dir().display(),
+                    config.output_dir().display()
+                )
             } else {
-                println!("{}", accent.apply_to("\nSite generated successfully! 🚀"));
-            }
+                "\nSite generated successfully! 🚀".to_string()
+            })
+        );
         }
-
         Commands::Serve {
             dir,
             port,
             hot_reload,
+            verbose,
         } => {
             let site_dir = dir.unwrap_or_else(|| PathBuf::from("."));
-            serve(site_dir, port, hot_reload)?;
+            let mut config = Config::load(&site_dir)?;
+            config.site_dir = fs::canonicalize(&site_dir)?;
+
+            // Override config with CLI args if provided
+            if let Some(p) = port {
+                config.build.port = p;
+            }
+            if let Some(v) = verbose {
+                config.build.verbose = v;
+            }
+            if let Some(h) = hot_reload {
+                config.build.hot_reload = h;
+            }
+
+            serve(config)?;
         }
     }
 

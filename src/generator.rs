@@ -248,6 +248,7 @@ mod tests {
             build: BuildConfig {
                 port: 8000,
                 verbose: false,
+                hot_reload: true,
                 output_dir: "dist".to_string(),
                 posts_dir: "posts".to_string(),
                 templates_dir: "templates".to_string(),
