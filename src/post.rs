@@ -15,14 +15,16 @@ pub struct Post {
 impl Post {
     // Get the assets directory for this post
     pub fn assets_dir(&self, config: &Config) -> PathBuf {
-        config.posts_dir()
+        config
+            .posts_dir()
             .join(&self.metadata.slug)
             .join(&config.build.post_assets_dir)
     }
 
     // Get the output directory for this post's assets
     pub fn assets_output_dir(&self, config: &Config) -> PathBuf {
-        config.output_dir()
+        config
+            .output_dir()
             .join("posts")
             .join(&self.metadata.slug)
             .join(&config.build.post_assets_dir)
@@ -36,25 +38,24 @@ impl Post {
         // Replace relative asset paths with absolute paths
         let content = self.content.replace(
             &format!("./{}/", config.build.post_assets_dir),
-            &format!("{}/{}/", post_url, config.build.post_assets_dir)
+            &format!("{}/{}/", post_url, config.build.post_assets_dir),
         );
         self.content = content.replace(
             &format!("./{}", config.build.post_assets_dir),
-            &format!("{}/{}", post_url, config.build.post_assets_dir)
+            &format!("{}/{}", post_url, config.build.post_assets_dir),
         );
 
         // Also update the HTML content
         let html_content = self.html_content.replace(
             &format!("./{}/", config.build.post_assets_dir),
-            &format!("{}/{}/", post_url, config.build.post_assets_dir)
+            &format!("{}/{}/", post_url, config.build.post_assets_dir),
         );
         self.html_content = html_content.replace(
             &format!("./{}", config.build.post_assets_dir),
-            &format!("{}/{}", post_url, config.build.post_assets_dir)
+            &format!("{}/{}", post_url, config.build.post_assets_dir),
         );
     }
 }
-
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct PostMetadata {
@@ -248,7 +249,7 @@ mod tests {
                 posts_dir: "posts".to_string(),
                 templates_dir: "templates".to_string(),
                 static_dir: "static".to_string(),
-                post_assets_dir: "assets".to_string()
+                post_assets_dir: "assets".to_string(),
             },
         };
 
@@ -286,7 +287,7 @@ mod tests {
                 posts_dir: "posts".to_string(),
                 templates_dir: "templates".to_string(),
                 static_dir: "static".to_string(),
-                post_assets_dir: "assets".to_string()
+                post_assets_dir: "assets".to_string(),
             },
         };
 
