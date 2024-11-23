@@ -5,7 +5,21 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
+// Default config.toml values
+const DEFAULT_BASE_URL: &str = "http://localhost:8080";
+const DEFAULT_TITLE: &str = "My Terminal Velocity Blog";
+const DEFAULT_DESCRIPTION: &str = "A blazingly fast tech blog";
+const DEFAULT_AUTHOR_NAME: &str = "Anonymous";
+const DEFAULT_AUTHOR_EMAIL: &str = "author@example.com";
+const DEFAULT_PORT: u16 = 8080;
+const DEFAULT_OUTPUT_DIR: &str = "dist";
+const DEFAULT_POSTS_DIR: &str = "posts";
+const DEFAULT_TEMPLATES_DIR: &str = "templates";
+const DEFAULT_STATIC_DIR: &str = "static";
+const DEFAULT_POST_ASSETS_DIR: &str = "assets";
+
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(default)]
 pub struct Config {
     #[serde(skip)]
     pub site_dir: PathBuf,
@@ -18,37 +32,61 @@ pub struct Config {
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(default)]
 pub struct Author {
     pub name: String,
     pub email: String,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]
+#[serde(default)]
 pub struct BuildConfig {
-    #[serde(default)]
     pub verbose: bool,
     pub output_dir: String,
     pub posts_dir: String,
     pub templates_dir: String,
     pub static_dir: String,
-    #[serde(default = "default_post_assets_dir")]
     pub post_assets_dir: String,
     #[serde(deserialize_with = "validate_port")]
-    #[serde(default = "default_port")]
     pub port: u16,
-    #[serde(default = "default_hot_reload")]
     pub hot_reload: bool,
 }
-fn default_hot_reload() -> bool {
-    true
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            site_dir: PathBuf::new(),
+            base_url: DEFAULT_BASE_URL.to_string(),
+            title: DEFAULT_TITLE.to_string(),
+            description: DEFAULT_DESCRIPTION.to_string(),
+            author: Author::default(),
+            build: BuildConfig::default(),
+        }
+    }
 }
 
-fn default_port() -> u16 {
-    8080
+impl Default for Author {
+    fn default() -> Self {
+        Self {
+            name: DEFAULT_AUTHOR_NAME.to_string(),
+            email: DEFAULT_AUTHOR_EMAIL.to_string(),
+        }
+    }
 }
 
-fn default_post_assets_dir() -> String {
-    "assets".to_string()
+impl Default for BuildConfig {
+    fn default() -> Self {
+        Self {
+            verbose: false,
+            output_dir: DEFAULT_OUTPUT_DIR.to_string(),
+            posts_dir: DEFAULT_POSTS_DIR.to_string(),
+            templates_dir: DEFAULT_TEMPLATES_DIR.to_string(),
+            static_dir: DEFAULT_STATIC_DIR.to_string(),
+            post_assets_dir: DEFAULT_POST_ASSETS_DIR.to_string(),
+            port: DEFAULT_PORT,
+            hot_reload: true,
+        }
+    }
 }
 
 impl Config {
@@ -64,13 +102,6 @@ impl Config {
         } else {
             Ok(Self::default())
         }
-    }
-
-    pub fn default() -> Self {
-        // TODO - Probably be stricter here and just fail if the config doesnt exist on disk.
-        // This was useful for early dev, but will probably cause confusion for real use
-        let default_config = include_str!(concat!(env!("OUT_DIR"), "/templates/config.toml"));
-        toml::from_str(default_config).expect("Failed to parse default config")
     }
 
     pub fn posts_dir(&self) -> PathBuf {
@@ -121,4 +152,56 @@ where
         ));
     }
     Ok(port)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_default_config() {
+        let config = Config::default();
+        assert_eq!(config.base_url, DEFAULT_BASE_URL);
+        assert_eq!(config.title, DEFAULT_TITLE);
+        assert_eq!(config.build.port, DEFAULT_PORT);
+        assert_eq!(config.build.output_dir, DEFAULT_OUTPUT_DIR);
+    }
+
+    #[test]
+    fn test_load_empty_config() -> Result<(), Error> {
+        let temp_dir = TempDir::new()?;
+        let config = Config::load(temp_dir.path())?;
+        assert_eq!(config.base_url, DEFAULT_BASE_URL);
+        assert_eq!(config.build.port, DEFAULT_PORT);
+        Ok(())
+    }
+
+    #[test]
+    fn test_load_partial_config() -> Result<(), Error> {
+        let temp_dir = TempDir::new()?;
+        let config_content = r#"
+            title = "Custom Blog"
+            [author]
+            name = "Test Author"
+        "#;
+        fs::write(temp_dir.path().join("config.toml"), config_content)?;
+
+        let config = Config::load(temp_dir.path())?;
+        assert_eq!(config.title, "Custom Blog");
+        assert_eq!(config.author.name, "Test Author");
+        assert_eq!(config.author.email, DEFAULT_AUTHOR_EMAIL);
+        assert_eq!(config.build.port, DEFAULT_PORT);
+        Ok(())
+    }
+
+    #[test]
+    fn test_invalid_port() {
+        let config_str = r#"
+            [build]
+            port = 80
+        "#;
+        let result: Result<Config, _> = toml::from_str(config_str);
+        assert!(result.is_err());
+    }
 }
