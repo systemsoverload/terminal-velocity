@@ -5,6 +5,7 @@ use walkdir::WalkDir;
 use yaml_front_matter::{Document, YamlFrontMatter};
 
 use crate::config::Config;
+use crate::constants::ACCENT_STYLE;
 use crate::errors::Error;
 use crate::markdown::MarkdownProcessor;
 use crate::post::Post;
@@ -18,6 +19,15 @@ pub struct SiteGenerator {
 
 impl SiteGenerator {
     pub fn new(config: &Config) -> Result<Self, Error> {
+        if config.build.verbose {
+            println!("Site directory: {}", config.site_dir.display());
+            println!("Posts directory: {}", config.posts_dir().display());
+            println!("Templates directory: {}", config.templates_dir().display());
+            println!("Output directory: {}", config.output_dir().display());
+        }
+
+        println!("{}", ACCENT_STYLE.apply_to("\nGenerating site..."));
+
         // Create output directory if it doesn't exist
         fs::create_dir_all(config.output_dir())?;
 

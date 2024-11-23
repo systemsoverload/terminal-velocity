@@ -174,6 +174,9 @@ slug: "{}"
     );
 
     fs::write(filepath.clone(), template)?;
+
+    println!("📝 Created new post: {}", title);
+
     Ok(filepath)
 }
 

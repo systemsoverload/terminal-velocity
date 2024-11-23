@@ -2,6 +2,7 @@
 
 mod anthropic;
 mod config;
+mod constants;
 mod errors;
 mod generator;
 mod git;
@@ -13,33 +14,17 @@ mod serve;
 use crate::config::ConfigOverrides;
 use clap::Parser;
 use clap::Subcommand;
-use console::Style;
 
 use std::path::PathBuf;
 
 use crate::config::Config;
+use crate::constants::{ACCENT_STYLE, BANNER};
 use crate::errors::Error;
 use crate::generator::SiteGenerator;
 use crate::git::open_editor;
 use crate::init::{create_directory_structure, validate_site_directory};
 use crate::post::create_new_post;
 use crate::serve::serve;
-
-const BANNER: &str = r#"
-████████╗███████╗██████╗ ███╗   ███╗██╗███╗   ██╗ █████╗ ██╗
-╚══██╔══╝██╔════╝██╔══██╗████╗ ████║██║████╗  ██║██╔══██╗██║
-   ██║   █████╗  ██████╔╝██╔████╔██║██║██╔██╗ ██║███████║██║
-   ██║   ██╔══╝  ██╔══██╗██║╚██╔╝██║██║██║╚██╗██║██╔══██║██║
-   ██║   ███████╗██║  ██║██║ ╚═╝ ██║██║██║ ╚████║██║  ██║███████╗
-   ╚═╝   ╚══════╝╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═══╝╚═╝  ╚═╝╚══════╝
-
-██╗   ██╗███████╗██╗      ██████╗  ██████╗██╗████████╗██╗   ██╗
-██║   ██║██╔════╝██║     ██╔═══██╗██╔════╝██║╚══██╔══╝╚██╗ ██╔╝
-██║   ██║█████╗  ██║     ██║   ██║██║     ██║   ██║    ╚████╔╝
-╚██╗ ██╔╝██╔══╝  ██║     ██║   ██║██║     ██║   ██║     ╚██╔╝
- ╚████╔╝ ███████╗███████╗╚██████╔╝╚██████╗██║   ██║      ██║
-  ╚═══╝  ╚══════╝╚══════╝ ╚═════╝  ╚═════╝╚═╝   ╚═╝      ╚═╝
-"#;
 
 #[derive(Parser)]
 #[command(name = "termv")]
@@ -102,11 +87,9 @@ enum Commands {
 fn main() -> Result<(), Error> {
     let cli = Cli::parse();
 
-    let accent = Style::new().cyan();
-
     match cli.command {
         Commands::Init { dir } => {
-            println!("{}", accent.apply_to(BANNER));
+            println!("{}", ACCENT_STYLE.apply_to(BANNER));
             create_directory_structure(&dir)?;
             println!("✨ Created new site at {}", &dir.display());
         }
@@ -128,7 +111,6 @@ fn main() -> Result<(), Error> {
             let filepath = rt.block_on(async {
                 create_new_post(&config, &title, prompt, anthropic_key).await
             })?;
-            println!("📝 Created new post: {}", title);
 
             open_editor(&filepath)?;
         }
@@ -147,21 +129,12 @@ fn main() -> Result<(), Error> {
 
             validate_site_directory(&config.site_dir)?;
 
-            if config.build.verbose {
-                println!("Site directory: {}", config.site_dir.display());
-                println!("Posts directory: {}", config.posts_dir().display());
-                println!("Templates directory: {}", config.templates_dir().display());
-                println!("Output directory: {}", config.output_dir().display());
-            }
-
-            println!("{}", accent.apply_to("\nGenerating site..."));
-
             let generator = SiteGenerator::new(&config)?;
             generator.generate_site()?;
 
             println!(
             "{}",
-            accent.apply_to(if config.build.verbose {
+            ACCENT_STYLE.apply_to(if config.build.verbose {
                 format!(
                     "\nSite generation complete!\nOutput directory: {}\nYou can serve the site locally with:\n  termv serve --directory {}",
                     config.output_dir().display(),
