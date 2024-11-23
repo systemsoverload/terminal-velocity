@@ -32,6 +32,12 @@ pub enum Error {
     #[error("Git error: {0}")]
     Git(#[from] git2::Error),
 
+    #[error("TOML error: {0}")]
+    Toml(#[from] toml::de::Error),
+
+    #[error("TOML serialization error: {0}")]
+    TomlSer(#[from] toml::ser::Error),
+
     #[error(transparent)]
     Other(#[from] Box<dyn std::error::Error + Send + Sync>),
 }

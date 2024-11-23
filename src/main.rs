@@ -10,10 +10,11 @@ mod markdown;
 mod post;
 mod serve;
 
+use crate::config::ConfigOverrides;
 use clap::Parser;
 use clap::Subcommand;
 use console::Style;
-use std::fs;
+
 use std::path::PathBuf;
 
 use crate::config::Config;
@@ -106,10 +107,10 @@ fn main() -> Result<(), Error> {
     match cli.command {
         Commands::Init { dir } => {
             println!("{}", accent.apply_to(BANNER));
-
             create_directory_structure(&dir)?;
             println!("✨ Created new site at {}", &dir.display());
         }
+
         Commands::New {
             title,
             prompt,
@@ -118,13 +119,10 @@ fn main() -> Result<(), Error> {
             author,
         } => {
             let site_dir = dir.unwrap_or_else(|| PathBuf::from("."));
-            let mut config = Config::load(&site_dir)?;
-            config.site_dir = fs::canonicalize(&site_dir)?;
-
-            // Override author if provided
-            if let Some(cli_author) = author {
-                config.author.name = cli_author;
-            }
+            let config = Config::load(&site_dir)?.with_overrides(ConfigOverrides {
+                author,
+                ..Default::default()
+            });
 
             let rt = tokio::runtime::Runtime::new()?;
             let filepath = rt.block_on(async {
@@ -134,30 +132,18 @@ fn main() -> Result<(), Error> {
 
             open_editor(&filepath)?;
         }
+
         Commands::Build {
             dir,
             output_path,
             verbose,
         } => {
             let site_dir = dir.unwrap_or_else(|| PathBuf::from("."));
-            let mut config = Config::load(&site_dir)?;
-            config.site_dir = fs::canonicalize(&site_dir)?;
-
-            // Override config with CLI args if provided
-            if let Some(path) = output_path {
-                // If the path is absolute, use it as-is
-                // If relative, make it relative to the current working directory, not the site dir
-                let output_dir = if path.is_absolute() {
-                    path
-                } else {
-                    std::env::current_dir()?.join(path)
-                };
-                config.set_output_dir(output_dir);
-            }
-
-            if let Some(v) = verbose {
-                config.build.verbose = v;
-            }
+            let config = Config::load(&site_dir)?.with_overrides(ConfigOverrides {
+                output_dir: output_path,
+                verbose,
+                ..Default::default()
+            });
 
             validate_site_directory(&config.site_dir)?;
 
@@ -186,6 +172,7 @@ fn main() -> Result<(), Error> {
             })
         );
         }
+
         Commands::Serve {
             dir,
             port,
@@ -193,19 +180,12 @@ fn main() -> Result<(), Error> {
             verbose,
         } => {
             let site_dir = dir.unwrap_or_else(|| PathBuf::from("."));
-            let mut config = Config::load(&site_dir)?;
-            config.site_dir = fs::canonicalize(&site_dir)?;
-
-            // Override config with CLI args if provided
-            if let Some(p) = port {
-                config.build.port = p;
-            }
-            if let Some(v) = verbose {
-                config.build.verbose = v;
-            }
-            if let Some(h) = hot_reload {
-                config.build.hot_reload = h;
-            }
+            let config = Config::load(&site_dir)?.with_overrides(ConfigOverrides {
+                port,
+                verbose,
+                hot_reload,
+                ..Default::default()
+            });
 
             serve(config)?;
         }

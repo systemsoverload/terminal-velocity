@@ -1,29 +1,13 @@
 use crate::errors::Error;
-use serde::Deserialize;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::Path;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
-// Default config.toml values
-const DEFAULT_BASE_URL: &str = "http://localhost:8080";
-const DEFAULT_TITLE: &str = "My Terminal Velocity Blog";
-const DEFAULT_DESCRIPTION: &str = "A blazingly fast tech blog";
-const DEFAULT_AUTHOR_NAME: &str = "Anonymous";
-const DEFAULT_AUTHOR_EMAIL: &str = "author@example.com";
-const DEFAULT_PORT: u16 = 8080;
-const DEFAULT_OUTPUT_DIR: &str = "dist";
-const DEFAULT_POSTS_DIR: &str = "posts";
-const DEFAULT_TEMPLATES_DIR: &str = "templates";
-const DEFAULT_STATIC_DIR: &str = "static";
-const DEFAULT_POST_ASSETS_DIR: &str = "assets";
-
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct Config {
     #[serde(skip)]
     pub site_dir: PathBuf,
-    #[serde(deserialize_with = "normalize_url")]
     pub base_url: String,
     pub title: String,
     pub description: String,
@@ -31,14 +15,35 @@ pub struct Config {
     pub build: BuildConfig,
 }
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            site_dir: PathBuf::new(),
+            base_url: "http://localhost:8080".into(),
+            title: "My Terminal Velocity Blog".into(),
+            description: "A blazingly fast tech blog".into(),
+            author: Author::default(),
+            build: BuildConfig::default(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct Author {
     pub name: String,
     pub email: String,
 }
+impl Default for Author {
+    fn default() -> Self {
+        Self {
+            name: "Anonymous".into(),
+            email: "author@example.com".into(),
+        }
+    }
+}
 
-#[derive(Deserialize, Serialize, Debug, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(default)]
 pub struct BuildConfig {
     pub verbose: bool,
@@ -47,63 +52,83 @@ pub struct BuildConfig {
     pub templates_dir: String,
     pub static_dir: String,
     pub post_assets_dir: String,
-    #[serde(deserialize_with = "validate_port")]
     pub port: u16,
     pub hot_reload: bool,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            site_dir: PathBuf::new(),
-            base_url: DEFAULT_BASE_URL.to_string(),
-            title: DEFAULT_TITLE.to_string(),
-            description: DEFAULT_DESCRIPTION.to_string(),
-            author: Author::default(),
-            build: BuildConfig::default(),
-        }
-    }
-}
-
-impl Default for Author {
-    fn default() -> Self {
-        Self {
-            name: DEFAULT_AUTHOR_NAME.to_string(),
-            email: DEFAULT_AUTHOR_EMAIL.to_string(),
-        }
-    }
 }
 
 impl Default for BuildConfig {
     fn default() -> Self {
         Self {
             verbose: false,
-            output_dir: DEFAULT_OUTPUT_DIR.to_string(),
-            posts_dir: DEFAULT_POSTS_DIR.to_string(),
-            templates_dir: DEFAULT_TEMPLATES_DIR.to_string(),
-            static_dir: DEFAULT_STATIC_DIR.to_string(),
-            post_assets_dir: DEFAULT_POST_ASSETS_DIR.to_string(),
-            port: DEFAULT_PORT,
+            output_dir: "dist".into(),
+            posts_dir: "posts".into(),
+            templates_dir: "templates".into(),
+            static_dir: "static".into(),
+            post_assets_dir: "assets".into(),
+            port: 8080,
             hot_reload: true,
         }
     }
+}
+
+// Simple override struct
+#[derive(Default)]
+pub struct ConfigOverrides {
+    pub port: Option<u16>,
+    pub verbose: Option<bool>,
+    pub hot_reload: Option<bool>,
+    pub output_dir: Option<PathBuf>,
+    pub author: Option<String>,
 }
 
 impl Config {
     pub fn load(site_dir: &Path) -> Result<Self, Error> {
         let config_path = site_dir.join("config.toml");
 
-        if config_path.exists() {
+        let mut config = if config_path.exists() {
             let content = fs::read_to_string(config_path)?;
-            let mut config: Config =
-                toml::from_str(&content).map_err(|e| Error::ConfigParse(e.to_string()))?;
-            config.site_dir = site_dir.to_path_buf();
-            Ok(config)
+            toml::from_str(&content).map_err(|e| Error::ConfigParse(e.to_string()))?
         } else {
-            Ok(Self::default())
-        }
+            Config::default()
+        };
+
+        config.site_dir = site_dir.to_path_buf();
+        Ok(config)
     }
 
+    pub fn with_overrides(mut self, overrides: ConfigOverrides) -> Self {
+        if let Some(port) = overrides.port {
+            self.build.port = port;
+        }
+        if let Some(verbose) = overrides.verbose {
+            self.build.verbose = verbose;
+        }
+        if let Some(hot_reload) = overrides.hot_reload {
+            self.build.hot_reload = hot_reload;
+        }
+        if let Some(ref output_dir) = overrides.output_dir {
+            // If the path is absolute, use it as-is
+            // If relative, make it relative to the current working directory, not the site dir
+            let path = if output_dir.is_absolute() {
+                output_dir.clone()
+            } else {
+                std::env::current_dir()
+                    .expect("Failed to get current directory")
+                    .join(output_dir)
+            };
+            self.build.output_dir = path.to_str().expect("Invalid output path").to_string();
+        }
+
+        if let Some(output_dir) = overrides.output_dir {
+            self.build.output_dir = output_dir.to_string_lossy().into();
+        }
+        if let Some(author) = overrides.author {
+            self.author.name = author;
+        }
+        self
+    }
+
+    // Path helper methods
     pub fn posts_dir(&self) -> PathBuf {
         self.site_dir.join(&self.build.posts_dir)
     }
@@ -116,14 +141,6 @@ impl Config {
         }
     }
 
-    pub fn set_output_dir<P: AsRef<Path>>(&mut self, path: P) {
-        self.build.output_dir = path
-            .as_ref()
-            .to_str()
-            .expect("Invalid output path")
-            .to_string();
-    }
-
     pub fn templates_dir(&self) -> PathBuf {
         self.site_dir.join(&self.build.templates_dir)
     }
@@ -133,75 +150,219 @@ impl Config {
     }
 }
 
-fn normalize_url<'de, D>(deserializer: D) -> Result<String, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let url = String::deserialize(deserializer)?;
-    Ok(url.trim_end_matches('/').to_string())
-}
-
-fn validate_port<'de, D>(deserializer: D) -> Result<u16, D::Error>
-where
-    D: serde::Deserializer<'de>,
-{
-    let port = u16::deserialize(deserializer)?;
-    if !(1024..=65535).contains(&port) {
-        return Err(serde::de::Error::custom(
-            "Port must be between 1024 and 65535",
-        ));
-    }
-    Ok(port)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::TempDir;
 
-    #[test]
-    fn test_default_config() {
-        let config = Config::default();
-        assert_eq!(config.base_url, DEFAULT_BASE_URL);
-        assert_eq!(config.title, DEFAULT_TITLE);
-        assert_eq!(config.build.port, DEFAULT_PORT);
-        assert_eq!(config.build.output_dir, DEFAULT_OUTPUT_DIR);
+    fn create_test_toml(content: &str) -> Result<(TempDir, PathBuf), Error> {
+        let temp_dir = TempDir::new()?;
+        let config_path = temp_dir.path().join("config.toml");
+        fs::write(&config_path, content)?;
+        Ok((temp_dir, config_path))
     }
 
     #[test]
-    fn test_load_empty_config() -> Result<(), Error> {
+    fn test_default_config() {
+        let config = Config::default();
+        assert_eq!(config.base_url, "http://localhost:8080");
+        assert_eq!(config.title, "My Terminal Velocity Blog");
+        assert_eq!(config.description, "A blazingly fast tech blog");
+        assert_eq!(config.author.name, "Anonymous");
+        assert_eq!(config.author.email, "author@example.com");
+        assert_eq!(config.build.port, 8080);
+        assert_eq!(config.build.output_dir, "dist");
+        assert_eq!(config.build.posts_dir, "posts");
+        assert_eq!(config.build.templates_dir, "templates");
+        assert_eq!(config.build.static_dir, "static");
+        assert_eq!(config.build.post_assets_dir, "assets");
+        assert!(config.build.hot_reload);
+        assert!(!config.build.verbose);
+    }
+
+    #[test]
+    fn test_load_empty_directory() -> Result<(), Error> {
         let temp_dir = TempDir::new()?;
         let config = Config::load(temp_dir.path())?;
-        assert_eq!(config.base_url, DEFAULT_BASE_URL);
-        assert_eq!(config.build.port, DEFAULT_PORT);
+
+        // Should use all defaults
+        assert_eq!(config.base_url, "http://localhost:8080");
+        assert_eq!(config.build.port, 8080);
+        assert_eq!(config.site_dir, temp_dir.path());
         Ok(())
     }
 
     #[test]
     fn test_load_partial_config() -> Result<(), Error> {
-        let temp_dir = TempDir::new()?;
         let config_content = r#"
             title = "Custom Blog"
+            base_url = "https://example.com"
+
             [author]
             name = "Test Author"
-        "#;
-        fs::write(temp_dir.path().join("config.toml"), config_content)?;
 
+            [build]
+            port = 9000
+        "#;
+
+        let (temp_dir, _) = create_test_toml(config_content)?;
         let config = Config::load(temp_dir.path())?;
+
+        // Check overridden values
         assert_eq!(config.title, "Custom Blog");
+        assert_eq!(config.base_url, "https://example.com");
         assert_eq!(config.author.name, "Test Author");
-        assert_eq!(config.author.email, DEFAULT_AUTHOR_EMAIL);
-        assert_eq!(config.build.port, DEFAULT_PORT);
+        assert_eq!(config.build.port, 9000);
+
+        // Check defaults are still used
+        assert_eq!(config.author.email, "author@example.com");
+        assert_eq!(config.build.output_dir, "dist");
+        assert!(!config.build.verbose);
         Ok(())
     }
 
     #[test]
-    fn test_invalid_port() {
-        let config_str = r#"
+    fn test_cli_overrides() -> Result<(), Error> {
+        let config_content = r#"
+            title = "Base Blog"
+
             [build]
-            port = 80
+            port = 8080
+            verbose = false
+            hot_reload = true
         "#;
-        let result: Result<Config, _> = toml::from_str(config_str);
-        assert!(result.is_err());
+
+        let (temp_dir, _) = create_test_toml(config_content)?;
+        let config = Config::load(temp_dir.path())?.with_overrides(ConfigOverrides {
+            port: Some(9000),
+            verbose: Some(true),
+            hot_reload: Some(false),
+            author: Some("CLI Author".into()),
+            output_dir: Some(PathBuf::from("/custom/output")),
+        });
+
+        // Check CLI overrides
+        assert_eq!(config.build.port, 9000);
+        assert!(config.build.verbose);
+        assert!(!config.build.hot_reload);
+        assert_eq!(config.author.name, "CLI Author");
+        assert_eq!(config.build.output_dir, "/custom/output");
+
+        // Check non-overridden values remain
+        assert_eq!(config.title, "Base Blog");
+        Ok(())
+    }
+
+    #[test]
+    fn test_partial_cli_overrides() -> Result<(), Error> {
+        let config_content = r#"
+            title = "Base Blog"
+
+            [build]
+            port = 8080
+            verbose = false
+        "#;
+
+        let (temp_dir, _) = create_test_toml(config_content)?;
+        let config = Config::load(temp_dir.path())?.with_overrides(ConfigOverrides {
+            port: Some(9000),
+            ..Default::default()
+        });
+
+        // Check only port is overridden
+        assert_eq!(config.build.port, 9000);
+        assert!(!config.build.verbose); // Unchanged
+        assert!(config.build.hot_reload); // Default value
+        assert_eq!(config.title, "Base Blog"); // Unchanged
+        Ok(())
+    }
+
+    #[test]
+    fn test_output_dir_handling() -> Result<(), Error> {
+        let temp_dir = TempDir::new()?;
+
+        // Test relative path
+        let config = Config::load(temp_dir.path())?.with_overrides(ConfigOverrides {
+            output_dir: Some(PathBuf::from("relative/output")),
+            ..Default::default()
+        });
+        assert_eq!(
+            config.output_dir(),
+            temp_dir.path().join("relative/output") // Joined to site_dir, not current_dir
+        );
+
+        // Test absolute path
+        let abs_path = if cfg!(windows) {
+            PathBuf::from(r"C:\absolute\output")
+        } else {
+            PathBuf::from("/absolute/output")
+        };
+
+        let config = Config::load(temp_dir.path())?.with_overrides(ConfigOverrides {
+            output_dir: Some(abs_path.clone()),
+            ..Default::default()
+        });
+        assert_eq!(config.output_dir(), abs_path);
+        Ok(())
+    }
+    #[test]
+    fn test_path_helper_methods() -> Result<(), Error> {
+        let temp_dir = TempDir::new()?;
+        let config = Config::load(temp_dir.path())?;
+
+        assert_eq!(config.posts_dir(), temp_dir.path().join("posts"));
+        assert_eq!(config.templates_dir(), temp_dir.path().join("templates"));
+        assert_eq!(config.static_dir(), temp_dir.path().join("static"));
+        assert_eq!(config.output_dir(), temp_dir.path().join("dist"));
+        Ok(())
+    }
+
+    #[test]
+    fn test_invalid_toml() {
+        let config_content = r#"
+            title = "Unclosed String
+            invalid toml content
+        "#;
+
+        let (temp_dir, _) = create_test_toml(config_content).unwrap();
+        let result = Config::load(temp_dir.path());
+        assert!(matches!(result, Err(Error::ConfigParse(_))));
+    }
+
+    #[test]
+    fn test_deserialize_from_str() -> Result<(), Error> {
+        let config_str = r#"
+            title = "From String"
+            base_url = "http://example.com"
+
+            [build]
+            port = 3000
+        "#;
+
+        let config: Config = toml::from_str(config_str)?;
+        assert_eq!(config.title, "From String");
+        assert_eq!(config.base_url, "http://example.com");
+        assert_eq!(config.build.port, 3000);
+        Ok(())
+    }
+
+    #[test]
+    fn test_config_serialize() -> Result<(), Error> {
+        let original_config = Config::default().with_overrides(ConfigOverrides {
+            port: Some(9000),
+            author: Some("Test Author".into()),
+            ..Default::default()
+        });
+
+        // Serialize to TOML
+        let serialized = toml::to_string(&original_config)?;
+
+        // Deserialize back
+        let deserialized: Config = toml::from_str(&serialized)?;
+
+        assert_eq!(deserialized.build.port, 9000);
+        assert_eq!(deserialized.author.name, "Test Author");
+        assert_eq!(deserialized.build.output_dir, "dist");
+        Ok(())
     }
 }
