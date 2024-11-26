@@ -1,13 +1,14 @@
+use crate::generator::SiteGenerator;
 use actix_files::Files;
 use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpResponse, HttpServer};
 use notify::{RecursiveMode, Watcher};
 
-use std::process::Command;
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 use crate::config::Config;
+use crate::errors::Error;
 
 pub struct Server {
     config: Config,
@@ -47,6 +48,7 @@ impl Server {
                 }
             }
 
+            let config_for_rebuild = self.config.clone();
             let _watcher_handler = std::thread::spawn(move || {
                 let mut last_build = Instant::now();
                 let debounce_duration = Duration::from_millis(500);
@@ -57,18 +59,14 @@ impl Server {
 
                     if last_build.elapsed() >= debounce_duration {
                         println!("🔄 Rebuilding site...");
-                        match Command::new("termv")
-                            .arg("build")
-                            .arg("--target-dir")
-                            .arg(&config_clone.site_dir)
-                            .status()
-                        {
-                            Ok(status) if status.success() => {
+
+                        // Use internal generator instead of spawning process
+                        match rebuild_site(&config_for_rebuild) {
+                            Ok(_) => {
                                 println!("✨ Site rebuilt successfully!");
                                 last_build = Instant::now();
                             }
-                            Ok(status) => eprintln!("Build failed with status: {}", status),
-                            Err(e) => eprintln!("Failed to execute build: {}", e),
+                            Err(e) => eprintln!("Build failed: {}", e),
                         }
                     }
                 }
@@ -95,6 +93,11 @@ impl Server {
         .run()
         .await
     }
+}
+
+fn rebuild_site(config: &Config) -> Result<(), Error> {
+    let generator = SiteGenerator::new(config)?;
+    generator.generate_site()
 }
 
 pub fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {

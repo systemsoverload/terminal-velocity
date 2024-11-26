@@ -1,12 +1,13 @@
-use crate::config::Config;
-use crate::errors::Error;
-use crate::markdown::MarkdownProcessor;
 use chrono::{Local, NaiveDate};
+use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
-use yaml_front_matter::Document;
-use yaml_front_matter::YamlFrontMatter;
+use yaml_front_matter::{Document, YamlFrontMatter};
+
+use crate::config::Config;
+use crate::errors::Error;
+use crate::markdown::MarkdownProcessor;
 
 #[derive(Debug, Serialize)]
 pub struct Post {
@@ -26,11 +27,14 @@ impl Post {
                 message: e.to_string(),
             })?;
 
-        Ok(Self {
+        let mut post = Self {
             metadata: doc.metadata,
             content: doc.content.clone(),
-            html_content: md_proc.render(&content),
-        })
+            html_content: md_proc.render(&doc.content),
+        };
+
+        post.metadata.read_time = calculate_read_time(&doc.content);
+        Ok(post)
     }
     // Get the assets directory for this post
     pub fn assets_dir(&self, config: &Config) -> PathBuf {
@@ -88,6 +92,8 @@ pub struct PostMetadata {
     pub preview: String,
     #[serde(deserialize_with = "validate_and_slugify")]
     pub slug: String,
+    #[serde(default)]
+    pub read_time: u32,
 }
 
 fn default_author() -> String {
@@ -114,6 +120,42 @@ where
         return Err(serde::de::Error::custom("Slug cannot be empty"));
     }
     Ok(slug)
+}
+
+// Calculate read time in minutes based on word count
+fn calculate_read_time(content: &str) -> u32 {
+    const WORDS_PER_MINUTE: u32 = 200; // Average adult reading speed
+
+    // Create a markdown parser with basic options
+    let mut options = Options::empty();
+    options.insert(Options::ENABLE_STRIKETHROUGH);
+    options.insert(Options::ENABLE_TABLES);
+
+    let parser = Parser::new_ext(content, options);
+
+    // Count words only in actual content, excluding code blocks and YAML frontmatter
+    let mut word_count = 0;
+    let mut in_code_block = false;
+
+    for event in parser {
+        match event {
+            Event::Start(Tag::CodeBlock(_)) => in_code_block = true,
+            Event::End(TagEnd::CodeBlock) => in_code_block = false,
+            Event::Text(text) if !in_code_block => {
+                // Count words in text content
+                word_count += text.split_whitespace().count();
+            }
+            _ => {}
+        }
+    }
+
+    // Calculate minutes rounded up to the nearest minute
+    let minutes = (word_count as f32 / WORDS_PER_MINUTE as f32).ceil() as u32;
+    if minutes == 0 {
+        1
+    } else {
+        minutes
+    }
 }
 
 pub fn slugify(text: &str) -> String {
@@ -180,10 +222,10 @@ slug: "{}"
 {}
 
 {}"#,
-        title,
+        title.trim(),
         date,
-        slug,
-        outline.as_ref().unwrap_or(&String::new()),
+        slug.trim(),
+        outline.as_ref().map(|o| o.trim()).unwrap_or(""),
         if outline.is_some() {
             "<!-- Generated outline above. Replace with your content. -->"
         } else {
@@ -364,4 +406,29 @@ slug: "test-post"
         assert!(doc.metadata.tags.is_empty());
         assert_eq!(doc.metadata.preview, "");
     }
+}
+
+#[test]
+fn test_read_time_in_post_metadata() {
+    let content = r#"---
+title: "Test Post"
+date: "2024-01-01"
+slug: "test-post"
+---
+
+This is a test post with enough words to make it take at least one minute to read.
+Let's add some more text to make sure we have enough content to test the read time calculation.
+We'll keep adding words until we have enough for a proper test of the functionality."#;
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
+    let test_file = temp_dir.path().join("test-post.md");
+    fs::write(&test_file, content).unwrap();
+
+    let md_proc = MarkdownProcessor::new();
+    let post = Post::new_from_path(&test_file, &md_proc).unwrap();
+
+    assert!(
+        post.metadata.read_time > 0,
+        "Read time should be calculated and greater than 0"
+    );
 }

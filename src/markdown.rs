@@ -27,7 +27,17 @@ impl MarkdownProcessor {
     }
 
     pub fn render(&self, content: &str) -> String {
-        let parser = MarkdownParser::new_ext(content, self.options);
+        let content_without_frontmatter = if let Some(stripped) = content.strip_prefix("---") {
+            if let Some(end_idx) = stripped.find("---") {
+                stripped[end_idx + 3..].trim_start()
+            } else {
+                content
+            }
+        } else {
+            content
+        };
+
+        let parser = MarkdownParser::new_ext(content_without_frontmatter, self.options);
         let mut events = Vec::new();
         let mut code_buffer = String::new();
         let mut in_code_block = false;
