@@ -1,15 +1,13 @@
 use chrono::NaiveDate;
+use console::Style;
 use std::fs::{self};
 use tera::{Context, Tera};
 use walkdir::WalkDir;
-use yaml_front_matter::{Document, YamlFrontMatter};
 
 use crate::config::Config;
-use crate::constants::ACCENT_STYLE;
 use crate::errors::Error;
 use crate::markdown::MarkdownProcessor;
 use crate::post::Post;
-use crate::post::PostMetadata;
 
 pub struct SiteGenerator {
     config: Config,
