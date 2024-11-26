@@ -1,30 +1,17 @@
-#![deny(unused_crate_dependencies)]
-
-mod anthropic;
-mod config;
-mod constants;
-mod errors;
-mod generator;
-mod git;
-mod init;
-mod markdown;
-mod post;
-mod serve;
-
-use crate::config::ConfigOverrides;
 use clap::Parser;
 use clap::Subcommand;
+use console::Style;
 
 use std::path::PathBuf;
 
-use crate::config::Config;
-use crate::constants::{ACCENT_STYLE, BANNER};
-use crate::errors::Error;
-use crate::generator::SiteGenerator;
-use crate::git::open_editor;
-use crate::init::{create_directory_structure, validate_site_directory};
-use crate::post::create_new_post;
-use crate::serve::serve;
+use terminal_velocity::config::{Config, ConfigOverrides};
+use terminal_velocity::constants::BANNER;
+use terminal_velocity::errors::Error;
+use terminal_velocity::generator::SiteGenerator;
+use terminal_velocity::git::open_editor;
+use terminal_velocity::init::{create_directory_structure, validate_site_directory};
+use terminal_velocity::post::create_new_post;
+use terminal_velocity::serve::serve;
 
 #[derive(Parser)]
 #[command(name = "termv")]
