@@ -1,9 +1,12 @@
 use crate::config::Config;
 use crate::errors::Error;
+use crate::markdown::MarkdownProcessor;
 use chrono::{Local, NaiveDate};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use yaml_front_matter::Document;
+use yaml_front_matter::YamlFrontMatter;
 
 #[derive(Debug, Serialize)]
 pub struct Post {
@@ -13,6 +16,22 @@ pub struct Post {
 }
 
 impl Post {
+    pub fn new_from_path(path: &Path, md_proc: &MarkdownProcessor) -> Result<Self, Error> {
+        let content = fs::read_to_string(path)?;
+        let file_name = path.display().to_string();
+
+        let doc: Document<PostMetadata> =
+            YamlFrontMatter::parse(&content).map_err(|e| Error::Frontmatter {
+                file: file_name,
+                message: e.to_string(),
+            })?;
+
+        Ok(Self {
+            metadata: doc.metadata,
+            content: doc.content.clone(),
+            html_content: md_proc.render(&content),
+        })
+    }
     // Get the assets directory for this post
     pub fn assets_dir(&self, config: &Config) -> PathBuf {
         config
@@ -56,7 +75,6 @@ impl Post {
         );
     }
 }
-
 #[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct PostMetadata {
     pub title: String,

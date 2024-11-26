@@ -26,7 +26,7 @@ impl SiteGenerator {
             println!("Output directory: {}", config.output_dir().display());
         }
 
-        println!("{}", ACCENT_STYLE.apply_to("\nGenerating site..."));
+        println!("{}", Style::new().cyan().apply_to("\nGenerating site..."));
 
         // Create output directory if it doesn't exist
         fs::create_dir_all(config.output_dir())?;
@@ -60,20 +60,7 @@ impl SiteGenerator {
             .filter_map(|e| e.ok())
             .filter(|e| e.path().extension().map_or(false, |ext| ext == "md"))
         {
-            let content = fs::read_to_string(entry.path())?;
-            let file_name = entry.path().display().to_string();
-
-            let doc: Document<PostMetadata> =
-                YamlFrontMatter::parse(&content).map_err(|e| Error::Frontmatter {
-                    file: file_name,
-                    message: e.to_string(),
-                })?;
-
-            posts.push(Post {
-                metadata: doc.metadata,
-                content: doc.content.clone(),
-                html_content: self.markdown.render(&doc.content),
-            });
+            posts.push(Post::new_from_path(entry.path(), &self.markdown)?);
         }
 
         Ok(posts)
