@@ -1,6 +1,8 @@
 # Terminal Velocity
 
 [![Main Branch Status](https://github.com/systemsoverload/terminal-velocity/actions/workflows/rust.yml/badge.svg?branch=main)](https://github.com/your-username/terminal-velocity/actions/workflows/rust.yml)
+[![Crates.io](https://img.shields.io/crates/v/html-compare-rs.svg)](https://crates.io/crates/terminal-velocity)
+[![Downloads](https://img.shields.io/crates/d/html-compare-rs.svg)](https://crates.io/crates/terminal-velocity)
 
 A blazingly fast static site generator for developers who want to write things down. Built with Rust for performance and efficiency.
 
