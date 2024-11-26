@@ -23,12 +23,12 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Initialize a new blog
+    /// Initialize a new site
     Init {
         #[arg(default_value = ".")]
         dir: PathBuf,
     },
-    /// Create a new blog post
+    /// Create a new post
     New {
         title: String,
 
@@ -57,6 +57,9 @@ enum Commands {
 
         #[arg(short, long)]
         verbose: Option<bool>,
+
+        #[arg(long, default_value = "true")]
+        auto_build: Option<bool>,
     },
     /// Build the site
     Build {
@@ -76,7 +79,7 @@ fn main() -> Result<(), Error> {
 
     match cli.command {
         Commands::Init { dir } => {
-            println!("{}", ACCENT_STYLE.apply_to(BANNER));
+            println!("{}", Style::new().cyan().apply_to(BANNER));
             create_directory_structure(&dir)?;
             println!("✨ Created new site at {}", &dir.display());
         }
@@ -121,7 +124,7 @@ fn main() -> Result<(), Error> {
 
             println!(
             "{}",
-            ACCENT_STYLE.apply_to(if config.build.verbose {
+            Style::new().cyan().apply_to(if config.build.verbose {
                 format!(
                     "\nSite generation complete!\nOutput directory: {}\nYou can serve the site locally with:\n  termv serve --directory {}",
                     config.output_dir().display(),
@@ -138,14 +141,22 @@ fn main() -> Result<(), Error> {
             port,
             hot_reload,
             verbose,
+            auto_build,
         } => {
             let site_dir = dir.unwrap_or_else(|| PathBuf::from("."));
             let config = Config::load(&site_dir)?.with_overrides(ConfigOverrides {
                 port,
                 verbose,
                 hot_reload,
+                auto_build,
+
                 ..Default::default()
             });
+
+            if config.server.auto_build {
+                let generator = SiteGenerator::new(&config)?;
+                generator.generate_site()?;
+            }
 
             serve(config)?;
         }
