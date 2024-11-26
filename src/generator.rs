@@ -256,14 +256,18 @@ mod tests {
                 email: "test@example.com".to_string(),
             },
             build: BuildConfig {
-                port: 8000,
                 verbose: false,
-                hot_reload: true,
+
                 output_dir: "dist".to_string(),
                 posts_dir: "posts".to_string(),
                 templates_dir: "templates".to_string(),
                 static_dir: "static".to_string(),
                 post_assets_dir: "assets".to_string(),
+            },
+            server: ServerConfig {
+                auto_build: true,
+                port: 8000,
+                hot_reload: true,
             },
         }
     }

@@ -13,17 +13,19 @@ pub struct Config {
     pub description: String,
     pub author: Author,
     pub build: BuildConfig,
+    pub server: ServerConfig,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
             site_dir: PathBuf::new(),
-            base_url: "http://localhost:8080".into(),
+            base_url: "http://localhost".into(),
             title: "My Terminal Velocity Blog".into(),
             description: "A blazingly fast tech blog".into(),
             author: Author::default(),
             build: BuildConfig::default(),
+            server: ServerConfig::default(),
         }
     }
 }
@@ -52,8 +54,6 @@ pub struct BuildConfig {
     pub templates_dir: String,
     pub static_dir: String,
     pub post_assets_dir: String,
-    pub port: u16,
-    pub hot_reload: bool,
 }
 
 impl Default for BuildConfig {
@@ -65,13 +65,28 @@ impl Default for BuildConfig {
             templates_dir: "templates".into(),
             static_dir: "static".into(),
             post_assets_dir: "assets".into(),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(default)]
+pub struct ServerConfig {
+    pub auto_build: bool,
+    pub port: u16,
+    pub hot_reload: bool,
+}
+
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            auto_build: true,
             port: 8080,
             hot_reload: true,
         }
     }
 }
 
-// Simple override struct
 #[derive(Default)]
 pub struct ConfigOverrides {
     pub port: Option<u16>,
@@ -79,6 +94,7 @@ pub struct ConfigOverrides {
     pub hot_reload: Option<bool>,
     pub output_dir: Option<PathBuf>,
     pub author: Option<String>,
+    pub auto_build: Option<bool>,
 }
 
 impl Config {
@@ -98,13 +114,13 @@ impl Config {
 
     pub fn with_overrides(mut self, overrides: ConfigOverrides) -> Self {
         if let Some(port) = overrides.port {
-            self.build.port = port;
+            self.server.port = port;
         }
         if let Some(verbose) = overrides.verbose {
             self.build.verbose = verbose;
         }
         if let Some(hot_reload) = overrides.hot_reload {
-            self.build.hot_reload = hot_reload;
+            self.server.hot_reload = hot_reload;
         }
         if let Some(ref output_dir) = overrides.output_dir {
             // If the path is absolute, use it as-is
@@ -165,18 +181,18 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = Config::default();
-        assert_eq!(config.base_url, "http://localhost:8080");
+        assert_eq!(config.base_url, "http://localhost");
         assert_eq!(config.title, "My Terminal Velocity Blog");
         assert_eq!(config.description, "A blazingly fast tech blog");
         assert_eq!(config.author.name, "Anonymous");
         assert_eq!(config.author.email, "author@example.com");
-        assert_eq!(config.build.port, 8080);
+        assert_eq!(config.server.port, 8080);
         assert_eq!(config.build.output_dir, "dist");
         assert_eq!(config.build.posts_dir, "posts");
         assert_eq!(config.build.templates_dir, "templates");
         assert_eq!(config.build.static_dir, "static");
         assert_eq!(config.build.post_assets_dir, "assets");
-        assert!(config.build.hot_reload);
+        assert!(config.server.hot_reload);
         assert!(!config.build.verbose);
     }
 
@@ -186,8 +202,8 @@ mod tests {
         let config = Config::load(temp_dir.path())?;
 
         // Should use all defaults
-        assert_eq!(config.base_url, "http://localhost:8080");
-        assert_eq!(config.build.port, 8080);
+        assert_eq!(config.base_url, "http://localhost");
+        assert_eq!(config.server.port, 8080);
         assert_eq!(config.site_dir, temp_dir.path());
         Ok(())
     }
@@ -201,7 +217,7 @@ mod tests {
             [author]
             name = "Test Author"
 
-            [build]
+            [server]
             port = 9000
         "#;
 
@@ -212,7 +228,7 @@ mod tests {
         assert_eq!(config.title, "Custom Blog");
         assert_eq!(config.base_url, "https://example.com");
         assert_eq!(config.author.name, "Test Author");
-        assert_eq!(config.build.port, 9000);
+        assert_eq!(config.server.port, 9000);
 
         // Check defaults are still used
         assert_eq!(config.author.email, "author@example.com");
@@ -239,12 +255,13 @@ mod tests {
             hot_reload: Some(false),
             author: Some("CLI Author".into()),
             output_dir: Some(PathBuf::from("/custom/output")),
+            auto_build: Some(true),
         });
 
         // Check CLI overrides
-        assert_eq!(config.build.port, 9000);
+        assert_eq!(config.server.port, 9000);
         assert!(config.build.verbose);
-        assert!(!config.build.hot_reload);
+        assert!(!config.server.hot_reload);
         assert_eq!(config.author.name, "CLI Author");
         assert_eq!(config.build.output_dir, "/custom/output");
 
@@ -270,9 +287,9 @@ mod tests {
         });
 
         // Check only port is overridden
-        assert_eq!(config.build.port, 9000);
+        assert_eq!(config.server.port, 9000);
         assert!(!config.build.verbose); // Unchanged
-        assert!(config.build.hot_reload); // Default value
+        assert!(config.server.hot_reload); // Default value
         assert_eq!(config.title, "Base Blog"); // Unchanged
         Ok(())
     }
@@ -335,14 +352,14 @@ mod tests {
             title = "From String"
             base_url = "http://example.com"
 
-            [build]
+            [server]
             port = 3000
         "#;
 
         let config: Config = toml::from_str(config_str)?;
         assert_eq!(config.title, "From String");
         assert_eq!(config.base_url, "http://example.com");
-        assert_eq!(config.build.port, 3000);
+        assert_eq!(config.server.port, 3000);
         Ok(())
     }
 
@@ -360,7 +377,7 @@ mod tests {
         // Deserialize back
         let deserialized: Config = toml::from_str(&serialized)?;
 
-        assert_eq!(deserialized.build.port, 9000);
+        assert_eq!(deserialized.server.port, 9000);
         assert_eq!(deserialized.author.name, "Test Author");
         assert_eq!(deserialized.build.output_dir, "dist");
         Ok(())

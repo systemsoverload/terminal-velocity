@@ -21,9 +21,9 @@ impl Server {
     pub async fn run(self) -> std::io::Result<()> {
         println!(
             "Starting server on http://localhost:{}",
-            self.config.build.port
+            self.config.server.port
         );
-        if self.config.build.hot_reload {
+        if self.config.server.hot_reload {
             let (tx, rx) = mpsc::channel();
 
             let mut watcher = notify::recommended_watcher(move |res| {
@@ -84,7 +84,7 @@ impl Server {
                         .to(|| async { HttpResponse::NotFound().body("404 - Page not found") }),
                 )
         })
-        .bind(("127.0.0.1", self.config.build.port))?
+        .bind(("127.0.0.1", self.config.server.port))?
         .run()
         .await
     }
