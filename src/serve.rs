@@ -23,8 +23,10 @@ impl Server {
             "Starting server on http://localhost:{}",
             self.config.server.port
         );
+
         if self.config.server.hot_reload {
             let (tx, rx) = mpsc::channel();
+            let config_clone = self.config.clone();
 
             let mut watcher = notify::recommended_watcher(move |res| {
                 if let Ok(event) = res {
@@ -33,10 +35,14 @@ impl Server {
             })
             .unwrap();
 
-            // Watch relevant directories
-            for dir in ["posts", "templates", "static"].iter() {
-                let path = self.config.site_dir.join(dir);
-                if path.exists() && watcher.watch(&path, RecursiveMode::Recursive).is_ok() {
+            let watch_paths = [
+                config_clone.posts_dir(),
+                config_clone.templates_dir(),
+                config_clone.static_dir(),
+            ];
+
+            for path in watch_paths.iter() {
+                if path.exists() && watcher.watch(path, RecursiveMode::Recursive).is_ok() {
                     println!("Watching directory: {}", path.display());
                 }
             }
@@ -44,18 +50,17 @@ impl Server {
             let _watcher_handler = std::thread::spawn(move || {
                 let mut last_build = Instant::now();
                 let debounce_duration = Duration::from_millis(500);
-                let _watcher = watcher; // Keep watcher alive in this thread
+                let _watcher = watcher;
 
                 while let Ok(_event) = rx.recv() {
                     println!("Change detected...");
 
-                    // Debounce builds
                     if last_build.elapsed() >= debounce_duration {
                         println!("🔄 Rebuilding site...");
                         match Command::new("termv")
                             .arg("build")
-                            .arg("-d")
-                            .arg(&self.config.site_dir)
+                            .arg("--target-dir")
+                            .arg(&config_clone.site_dir)
                             .status()
                         {
                             Ok(status) if status.success() => {
@@ -70,11 +75,13 @@ impl Server {
             });
         }
 
+        let output_dir = self.config.output_dir();
+
         HttpServer::new(move || {
             App::new()
                 .wrap(Logger::default())
                 .service(
-                    Files::new("/", self.config.build.output_dir.clone())
+                    Files::new("/", output_dir.clone())
                         .index_file("index.html")
                         .use_last_modified(true)
                         .use_etag(true),
@@ -91,7 +98,6 @@ impl Server {
 }
 
 pub fn serve(config: Config) -> Result<(), Box<dyn std::error::Error>> {
-    // Always consider the output dir to be relative to the site dir
     let output_dir = config.output_dir();
 
     if !output_dir.exists() {
