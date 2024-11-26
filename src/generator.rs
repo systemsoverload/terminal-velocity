@@ -240,37 +240,12 @@ impl SiteGenerator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{Author, BuildConfig};
+
+    use crate::post::PostMetadata;
+    use crate::tests::create_test_config;
+
     use std::fs;
     use tempfile::TempDir;
-
-    fn create_test_config(temp_dir: &TempDir) -> Config {
-        let site_dir = temp_dir.path().to_path_buf();
-        Config {
-            site_dir,
-            base_url: "http://localhost:8000".to_string(),
-            title: "Test Blog".to_string(),
-            description: "Test Description".to_string(),
-            author: Author {
-                name: "Test Author".to_string(),
-                email: "test@example.com".to_string(),
-            },
-            build: BuildConfig {
-                verbose: false,
-
-                output_dir: "dist".to_string(),
-                posts_dir: "posts".to_string(),
-                templates_dir: "templates".to_string(),
-                static_dir: "static".to_string(),
-                post_assets_dir: "assets".to_string(),
-            },
-            server: ServerConfig {
-                auto_build: true,
-                port: 8000,
-                hot_reload: true,
-            },
-        }
-    }
 
     fn setup_test_site(temp_dir: &TempDir) -> std::io::Result<()> {
         // Create required directories
