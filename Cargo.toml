@@ -1,6 +1,6 @@
 [package]
 name = "terminal-velocity"
-version = "0.1.7"
+version = "0.1.8"
 build = "build.rs"
 description = "A blazingly fast static site generator for dorks"
 authors = ["TJK <tjkells@gmail.com>"]
